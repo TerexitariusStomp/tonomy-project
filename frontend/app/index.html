@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>cXc Pangea Integration</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-api.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jsonrpc.min.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="logo">cXc</span>
+      <span class="subtitle">Pangea Passport</span>
+    </div>
+    <button id="connectBtn" class="btn primary">Connect Tonomy ID</button>
+  </header>
+
+  <main>
+    <section class="card two-column">
+      <div>
+        <h2>Invite Friends</h2>
+        <p>Share your username to earn tetrahedral BLUX rewards.</p>
+        <label>Inviter Code</label>
+        <input id="inviteCode" placeholder="alice.cxc">
+        <label>Invite New User</label>
+        <input id="inviteTarget" placeholder="bob.cxc">
+        <button id="sendInvite" class="btn primary">Send Invite</button>
+        <div id="inviteResult" class="hint"></div>
+      </div>
+      <div>
+        <h3>Your Stats</h3>
+        <div id="stats" class="stat-grid">
+          <div><span>Direct</span><strong>0</strong></div>
+          <div><span>Network</span><strong>0</strong></div>
+          <div><span>Rewards</span><strong>0 BLUX</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card two-column">
+      <div>
+        <h2>Daily Upvotes</h2>
+        <p>Claim daily upvotes based on your Passport verification level.</p>
+        <button id="claimUpvotes" class="btn primary">Claim Daily Upvotes</button>
+        <div id="upvoteStatus" class="hint"></div>
+      </div>
+      <div>
+        <h3>Allocation</h3>
+        <div id="upvoteMeter" class="meter">
+          <div class="fill" style="width: 0%"></div>
+        </div>
+        <div id="upvoteCounts" class="hint">0 / 0 upvotes</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Bridge BLUX: WAX → Tonomy</h2>
+      <div class="grid">
+        <div>
+          <label>Amount (BLUX)</label>
+          <input id="bridgeAmount" type="number" min="1" step="0.0001" placeholder="100.0000">
+        </div>
+        <div>
+          <label>Tonomy Account</label>
+          <input id="tonomyAccount" placeholder="alice.cxc">
+        </div>
+        <div>
+          <label>WAX Account</label>
+          <input id="waxAccount" placeholder="alice.wam">
+        </div>
+      </div>
+      <button id="bridgeBtn" class="btn primary">Bridge Tokens</button>
+      <div id="bridgeStatus" class="hint"></div>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
