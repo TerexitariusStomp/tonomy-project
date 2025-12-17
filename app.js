@@ -14,8 +14,7 @@ let sessionDidLevel = null;
 
 async function getRpc() {
   if (!rpc) {
-    const eosjsMod = await import('https://cdn.skypack.dev/eosjs@22.1.0');
-    const { JsonRpc } = eosjsMod;
+    const { JsonRpc } = EosjsJsonRpc;
     rpc = new JsonRpc(rpcEndpoint);
   }
   return rpc;

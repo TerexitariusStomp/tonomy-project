@@ -88,13 +88,9 @@ async function createAnchorSigner() {
 }
 
 export async function createLocalSigner(privateKey) {
-  const eosjs = await import('https://cdn.skypack.dev/eosjs@22.1.0');
-  const { Api, JsonRpc } = eosjs;
-  const { JsSignatureProvider } = eosjs;
-
-  const rpcLocal = new JsonRpc(NODE_URL);
-  const signatureProvider = new JsSignatureProvider([privateKey]);
-  const api = new Api({
+  const rpcLocal = new window.eosjs.JsonRpc(NODE_URL);
+  const signatureProvider = new window.eosjs.JsSignatureProvider([privateKey]);
+  const api = new window.eosjs.Api({
     rpc: rpcLocal,
     signatureProvider,
     chainId: CHAIN_ID
