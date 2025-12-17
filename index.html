@@ -6,9 +6,6 @@
   <title>cXc Pangea Integration</title>
   <!-- Updated for GitHub Pages deployment -->
   <link rel="stylesheet" href="./style.css">
-  <script src="https://unpkg.com/eosjs@22.1.0/dist/eosjs-api.min.js"></script>
-  <script src="https://unpkg.com/eosjs@22.1.0/dist/eosjs-jsonrpc.min.js"></script>
-  <script src="https://unpkg.com/eosjs@22.1.0/dist/eosjs-jssig.min.js"></script>
 </head>
 <body>
   <header>
@@ -16,7 +13,14 @@
       <span class="logo">cXc</span>
       <span class="subtitle">Pangea Passport</span>
     </div>
-    <button id="connectBtn" class="btn primary">Connect Tonomy ID</button>
+    <div class="auth-controls">
+      <select id="signerSelect">
+        <option value="auto">Auto: Tonomy / Anchor</option>
+        <option value="tonomy">Tonomy ID</option>
+        <option value="anchor">Anchor Link</option>
+      </select>
+    </div>
+    <button id="connectBtn" class="btn primary">Connect</button>
   </header>
 
   <main>
@@ -72,13 +76,21 @@
           <label>WAX Account</label>
           <input id="waxAccount" placeholder="alice.wam">
         </div>
+        <div>
+          <label>Bridge Memo</label>
+          <input id="bridgeMemo" placeholder="TRANSFER_..." readonly>
+        </div>
       </div>
       <button id="bridgeBtn" class="btn primary">Bridge Tokens</button>
+      <button id="bridgeCheckBtn" class="btn secondary">Check Bridge Status</button>
       <div id="bridgeStatus" class="hint"></div>
     </section>
   </main>
 
-  <!-- Trigger GitHub Pages rebuild -->
+  <!-- eosjs globals for browser usage -->
+  <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jsonrpc.min.js" integrity="sha256-Zl7UsYjx3MHJb2i2McOMnvou+EGb/R58jFb3QaJbxV4=" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jssig.min.js" integrity="sha256-N3WFw9XcGO2YsQg8oqwiCB3Up5Zdwqs7GgZvs8o+pZk=" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-api.min.js" integrity="sha256-+11QtS9v0XR3p4cLrdu/kHzKf6Mr7R/4BIqwl2fv9H4=" crossorigin="anonymous"></script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

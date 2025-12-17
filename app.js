@@ -1,20 +1,20 @@
-import { createSigner, createLocalSigner } from "./signer.js";
+import { createSigner, detectSignerPreference } from "./signer.js";
 
 // Default to EOS mainnet. Swap to Jungle or Pangea RPC as needed.
 const rpcEndpoint = "https://eos.greymass.com";
 // const rpcEndpoint = "https://jungle3.eosio.dev"; // Jungle
 // const rpcEndpoint = "https://pangea.rpc.url";    // Pangea
 
-const PRIVATE_KEY = "PVT_K1_2Sp6bHRp64zYAfmifM744u7j77QxBkDEEd69jT9hRVXKQuKe4V";
-
 let signer = null;
 let rpc = null;
 let sessionAccount = null;
 let sessionDidLevel = null;
+let selectedSignerKind = "auto";
+let lastBridgeMemo = "";
 
 async function getRpc() {
   if (!rpc) {
-    const { JsonRpc } = EosjsJsonRpc;
+    const { JsonRpc } = eosjs_jsonrpc;
     rpc = new JsonRpc(rpcEndpoint);
   }
   return rpc;
@@ -79,17 +79,29 @@ async function getDownstreamCounts(root) {
   return idx.rows;
 }
 
-async function transact(actions) {
+async function ensureSigner() {
+  const resolvedKind = selectedSignerKind === "auto" ? detectSignerPreference() : selectedSignerKind;
   if (!signer) {
-    signer = await createLocalSigner(PRIVATE_KEY);
+    signer = await createSigner(resolvedKind);
+  }
+  if (!sessionAccount) {
     const { account } = await signer.login();
     sessionAccount = account;
+  }
+  return signer;
+}
+
+async function transact(actions) {
+  await ensureSigner();
+  if (!signer) {
+    throw new Error("No signer available");
   }
   return signer.transact({ actions });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   const connectBtn = document.getElementById("connectBtn");
+  const signerSelect = document.getElementById("signerSelect");
   const inviteBtn = document.getElementById("sendInvite");
   const inviteCode = document.getElementById("inviteCode");
   const inviteTarget = document.getElementById("inviteTarget");
@@ -102,17 +114,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const upvoteCounts = document.getElementById("upvoteCounts");
 
   const bridgeBtn = document.getElementById("bridgeBtn");
+  const bridgeCheckBtn = document.getElementById("bridgeCheckBtn");
+  const bridgeMemoInput = document.getElementById("bridgeMemo");
   const bridgeStatus = document.getElementById("bridgeStatus");
 
   connectBtn?.addEventListener("click", async () => {
     try {
-      signer = await createLocalSigner(PRIVATE_KEY);
-      const { account } = await signer.login();
-      sessionAccount = account;
-      const stats = await getUserStats(account);
+      selectedSignerKind = signerSelect?.value || "auto";
+      signer = null;
+      sessionAccount = null;
+      sessionDidLevel = null;
+
+      await ensureSigner();
+
+      const stats = await getUserStats(sessionAccount);
       sessionDidLevel = stats ? stats.verification_level : null;
-      inviteCode.value = account;
-      setHint(inviteResult, `Connected as ${account}`, true);
+      inviteCode.value = sessionAccount;
+      setHint(inviteResult, `Connected as ${sessionAccount}`, true);
       if (stats) {
         statsGrid.querySelectorAll("strong")[0].textContent = stats.direct_invites || 0;
         statsGrid.querySelectorAll("strong")[1].textContent = stats.total_downstream || 0;
@@ -126,7 +144,8 @@ document.addEventListener("DOMContentLoaded", () => {
   inviteBtn.addEventListener("click", async () => {
     try {
       setHint(inviteResult, "Sending invite...");
-      const inviter = inviteCode.value.trim();
+      await ensureSigner();
+      const inviter = inviteCode.value.trim() || sessionAccount;
       const invited = inviteTarget.value.trim();
 
       await transact([{
@@ -146,6 +165,7 @@ document.addEventListener("DOMContentLoaded", () => {
   upvoteBtn.addEventListener("click", async () => {
     try {
       setHint(upvoteStatus, "Claiming upvotes...");
+      await ensureSigner();
       const user = inviteCode.value.trim() || sessionAccount;
       await transact([{
         account: "invite.cxc",
@@ -172,9 +192,44 @@ document.addEventListener("DOMContentLoaded", () => {
       setHint(bridgeStatus, "Initiating bridge...");
       // Bridge initiation requires WAX-side lock; surface memo and action params for a WAX wallet SDK call.
       const memo = `TRANSFER_${Date.now()}`;
+      lastBridgeMemo = memo;
+      bridgeMemoInput.value = memo;
       setHint(
         bridgeStatus,
         `Lock ${amount} BLUX from ${waxAccount} to ${tonomyAccount} on bridge.cxc (WAX) memo ${memo}; then wait for oracle mint on Tonomy.`,
+        true
+      );
+    } catch (err) {
+      setHint(bridgeStatus, `Error: ${err.message}`);
+    }
+  });
+
+  bridgeCheckBtn?.addEventListener("click", async () => {
+    try {
+      const memo = bridgeMemoInput.value.trim() || lastBridgeMemo;
+      if (!memo) throw new Error("Enter or generate a bridge memo first");
+      setHint(bridgeStatus, "Checking bridge status...");
+      const r = await getRpc();
+      const res = await r.get_table_rows({
+        code: "bridge.cxc",
+        scope: "bridge.cxc",
+        table: "bridge_transfers",
+        lower_bound: memo,
+        upper_bound: memo,
+        limit: 1,
+      });
+      const row = res.rows?.[0];
+      if (!row) {
+        setHint(bridgeStatus, `No bridge transfer found for memo ${memo}`);
+        return;
+      }
+      const status = row.status || row.state || "pending";
+      const qty = row.quantity || row.amount || "";
+      const waxFrom = row.wax_account || row.from || "";
+      const tonomyTo = row.tonomy_account || row.to || "";
+      setHint(
+        bridgeStatus,
+        `Status: ${status} | ${qty} from ${waxFrom} to ${tonomyTo} (memo ${memo})`,
         true
       );
     } catch (err) {

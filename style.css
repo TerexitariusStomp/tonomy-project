@@ -92,6 +92,7 @@ button.btn {
   color: #fff;
 }
 .primary { background: linear-gradient(135deg, #ff5c8d, #ff9a5f); }
+.secondary { background: #0f131b; border: 1px solid var(--border); color: var(--text); }
 .btn:active { transform: translateY(1px); }
 .hint { margin-top: 8px; color: var(--muted); font-size: 13px; }
 .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
@@ -100,6 +101,10 @@ button.btn {
 .stat-grid strong { font-size: 18px; }
 .meter { width: 100%; height: 10px; background: #0f131b; border-radius: 20px; overflow: hidden; border: 1px solid var(--border); }
 .meter .fill { height: 100%; background: linear-gradient(90deg, #3ecf8e, #ff9a5f); }
+.auth-controls { display: flex; gap: 8px; align-items: center; }
+.auth-controls select { width: auto; min-width: 180px; }
+.hidden { display: none; }
 @media (max-width: 640px) {
   header { flex-direction: column; gap: 8px; align-items: flex-start; }
+  .auth-controls { width: 100%; flex-wrap: wrap; }
 }

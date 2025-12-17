@@ -88,9 +88,9 @@ async function createAnchorSigner() {
 }
 
 export async function createLocalSigner(privateKey) {
-  const rpcLocal = new window.eosjs.JsonRpc(NODE_URL);
-  const signatureProvider = new window.eosjs.JsSignatureProvider([privateKey]);
-  const api = new window.eosjs.Api({
+  const rpcLocal = new window.eosjs_jsonrpc.JsonRpc(NODE_URL);
+  const signatureProvider = new window.eosjs_jssig.JsSignatureProvider([privateKey]);
+  const api = new window.eosjs_api.Api({
     rpc: rpcLocal,
     signatureProvider,
     chainId: CHAIN_ID
