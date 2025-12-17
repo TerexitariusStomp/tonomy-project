@@ -1,6 +1,5 @@
-// Signer adapter supporting Tonomy ID and Anchor Link.
-// For pure browser usage without bundling, only injected window.tonomy will work.
-// For full support, bundle @tonomy/tonomy-id-sdk and anchor-link (+browser transport) or expose them on window.
+// Signer adapter supporting Tonomy ID (mobile-first) with optional Anchor fallback.
+// For pure browser usage without bundling, inject window.tonomy or window.createTonomyId.
 
 // Default network targets EOS mainnet; callers can pass a different RPC/chainId (e.g., Pangea).
 const DEFAULT_NETWORK = {
@@ -16,72 +15,14 @@ function normalizeNetwork(network) {
 }
 
 export function detectSignerPreference() {
-  const stored = typeof localStorage !== "undefined" ? localStorage.getItem("signerPreference") : null;
-  if (stored) return stored;
-  if (typeof window !== "undefined" && window.tonomy) return "tonomy";
-  if (typeof window !== "undefined" && window.esrHelper) return "esr";
-  return "anchor";
+  if (typeof window !== "undefined" && (window.tonomy || window.createTonomyId)) return "tonomy";
+  return "tonomy";
 }
 
 export async function createSigner(kind = detectSignerPreference(), network) {
   const net = normalizeNetwork(network);
-  if (kind === "esr") return createEsrSigner(net);
   if (kind === "tonomy") return createTonomySigner();
   return createAnchorSigner(net);
-}
-
-function parseEsrCallbackFromUrl() {
-  if (typeof window === "undefined") return null;
-  try {
-    const url = new URL(window.location.href);
-    if (!url.searchParams.get("esrResponse")) return null;
-    return {
-      request: url.searchParams.get("request"),
-      signature: url.searchParams.get("signature"),
-      account: url.searchParams.get("account"),
-      permission: url.searchParams.get("permission"),
-      requestId: url.searchParams.get("requestId"),
-    };
-  } catch (e) {
-    return null;
-  }
-}
-
-function buildCallbackUrl(requestId) {
-  return `${window.location.origin}${window.location.pathname}?esrResponse=1&requestId=${requestId}`;
-}
-
-async function createEsrSigner(network) {
-  const helper = window.esrHelper;
-  if (!helper) {
-    throw new Error("ESR helper not loaded. Ensure ESR helper script is included in index.html.");
-  }
-  if (helper.setNetwork) {
-    helper.setNetwork({ chainId: network.chainId, rpcEndpoint: network.nodeUrl });
-  }
-
-  function makeDeepLink(esrUri) {
-    return `tonomy://sign?request=${encodeURIComponent(esrUri)}`;
-  }
-
-  async function login() {
-    const requestId = Date.now().toString();
-    const callback = buildCallbackUrl(requestId);
-    const esrUri = await helper.createIdentityEsr(callback);
-    const deepLink = makeDeepLink(esrUri);
-    const callbackData = parseEsrCallbackFromUrl();
-    return { esrUri, deepLink, requestId, account: callbackData?.account || null, callbackData };
-  }
-
-  async function transact(args) {
-    const requestId = Date.now().toString();
-    const callback = buildCallbackUrl(requestId);
-    const esrUri = await helper.createEsr(args.actions, { broadcast: true, callback, chainId: network.chainId });
-    const deepLink = makeDeepLink(esrUri);
-    return { esrUri, deepLink, requestId };
-  }
-
-  return { kind: "esr", login, transact };
 }
 
 async function createTonomySigner() {
@@ -104,8 +45,15 @@ async function createTonomySigner() {
   }
 
   async function login() {
-    const { session, account } = await tonomy.login();
-    return { session, account };
+    console.log('Tonomy login called');
+    try {
+      const { session, account } = await tonomy.login();
+      console.log('Tonomy login success:', { session: session ? 'exists' : null, account });
+      return { session, account };
+    } catch (err) {
+      console.error('Tonomy login error:', err.message);
+      throw err;
+    }
   }
 
   async function transact(args) {

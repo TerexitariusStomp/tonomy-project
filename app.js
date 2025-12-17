@@ -1,4 +1,10 @@
-import { createSigner, detectSignerPreference } from "./signer.js";
+console.log('app.js loaded');
+
+import { createSigner } from "./signer.js";
+import { ExternalUser, setSettings } from "https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@0.6.2/dist/tonomy-id-sdk.esm.js";
+import { JsonRpc } from "https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jsonrpc.esm.js";
+import { JsSignatureProvider } from "https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jssig.esm.js";
+import { Api } from "https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-api.esm.js";
 
 // Network presets; update pangea values once live RPC + chainId are confirmed.
 const NETWORKS = {
@@ -16,9 +22,9 @@ const NETWORKS = {
   },
   jungle: {
     label: "Jungle Testnet",
-    rpc: "https://jungle3.eosio.dev",
-    chainId: "73e4385a2708e6d7048834fbc1079f2fabb17b3c125b146af438971e90716c4d",
-    explorerTx: "https://jungle.eosq.eosnation.io/tx/"
+    rpc: "https://jungle4.api.eosnation.io",
+    chainId: "cf057bbfb72640471fd910bcb67639c22df9f92470936cddc1ade0e2f2e7dc4f",
+    explorerTx: "https://jungle4.bloks.io/transaction/"
   },
   custom: {
     label: "Custom",
@@ -42,7 +48,7 @@ const PASSPORT_ALLOWANCES = {
 
 const ONBOARDING_STEPS = [
   { key: "welcome", title: "Welcome", detail: "Learn the cXc.world + Pangea flow." },
-  { key: "create", title: "Create / Connect account", detail: "Sign in with Tonomy ID or Anchor." },
+  { key: "create", title: "Create / Connect account", detail: "Sign in with Tonomy ID." },
   { key: "invite", title: "Enter invite code", detail: "Redeem a code to unlock daily upvotes." },
   { key: "verify", title: "Verify DID", detail: "Increase daily upvotes by completing verification." },
   { key: "tutorial", title: "Tutorial", detail: "Finish the walkthrough and start upvoting." },
@@ -50,9 +56,8 @@ const ONBOARDING_STEPS = [
 
 let signer = null;
 let rpc = null;
-let sessionAccount = null;
+let sessionAccount = (typeof localStorage !== "undefined" && localStorage.getItem("sessionAccount")) || null;
 let sessionDidLevel = null;
-let selectedSignerKind = "auto";
 let selectedNetwork = (typeof localStorage !== "undefined" && localStorage.getItem("network")) || "pangea";
 let customNetwork = {
   rpc: (typeof localStorage !== "undefined" && localStorage.getItem("customRpc")) || "",
@@ -61,8 +66,6 @@ let customNetwork = {
 let onboardingStepKey = (typeof localStorage !== "undefined" && localStorage.getItem("onboardingStep")) || ONBOARDING_STEPS[0].key;
 let lastBridgeMemo = "";
 let bridgePollHandle = null;
-let lastEsrPayload = null;
-let esrCallbackData = null;
 let upvoteBtnEl = null;
 let upvoteStatusEl = null;
 let upvoteMeterFillEl = null;
@@ -135,16 +138,6 @@ function estimateResetTime(allocRow) {
   return fallback;
 }
 
-function updateEsrOutputs(payload, msg) {
-  const esrUriField = document.getElementById("esrUri");
-  const esrDeepLinkField = document.getElementById("esrDeepLink");
-  const esrStatus = document.getElementById("esrStatus");
-  if (!payload) return;
-  if (esrUriField) esrUriField.value = payload.esrUri || payload.request || "";
-  if (esrDeepLinkField) esrDeepLinkField.value = payload.deepLink || "";
-  if (esrStatus && msg) setHint(esrStatus, msg, true);
-}
-
 async function getUserStats(account) {
   const r = await getRpc();
   const res = await r.get_table_rows({
@@ -208,7 +201,7 @@ function renderPassportLevel(level) {
     const base = deriveAllowance(lvl);
     passportHintEl.textContent = lvl
       ? `Level ${lvl} detected. Base allowance ${base} upvotes/day.`
-      : "Connect with Tonomy or Anchor to load your level.";
+      : "Connect with Tonomy to load your level.";
   }
 }
 
@@ -258,56 +251,51 @@ async function refreshPassportAndUpvotes(account, stats) {
   }
 }
 
-function parseEsrCallbackAndClear() {
-  try {
-    const url = new URL(window.location.href);
-    if (!url.searchParams.get("esrResponse")) return null;
-    const data = {
-      request: url.searchParams.get("request"),
-      signature: url.searchParams.get("signature"),
-      account: url.searchParams.get("account"),
-      permission: url.searchParams.get("permission"),
-      requestId: url.searchParams.get("requestId"),
-    };
-    ["esrResponse", "request", "signature", "account", "permission", "requestId"].forEach((k) =>
-      url.searchParams.delete(k)
-    );
-    window.history.replaceState({}, document.title, url.toString());
-    return data;
-  } catch (e) {
-    return null;
-  }
-}
-
 async function ensureSigner() {
-  const resolvedKind = selectedSignerKind === "auto" ? detectSignerPreference() : selectedSignerKind;
+  console.log('Ensuring signer...');
   if (!signer) {
-    signer = await createSigner(resolvedKind, currentNetwork());
+    signer = await createSigner("tonomy", currentNetwork());
   }
   if (!sessionAccount) {
+    console.log('No sessionAccount, attempting login...');
     const loginResult = await signer.login();
+    console.log('Login result:', loginResult);
     if (loginResult?.account) {
       sessionAccount = loginResult.account;
-    }
-    if (signer.kind === "esr") {
-      lastEsrPayload = loginResult;
-      if (esrCallbackData?.account && !sessionAccount) {
-        sessionAccount = esrCallbackData.account;
-      }
     }
   }
   return signer;
 }
 
+async function initSession() {
+  console.log('Starting initSession');
+  try {
+    await ensureSigner();
+    if (sessionAccount) {
+      const stats = await getUserStats(sessionAccount);
+      sessionDidLevel = stats?.verification_level ?? 0;
+      if (inviteCode) inviteCode.value = sessionAccount;
+      setHint(inviteResult, `Auto-connected as ${sessionAccount}`, true);
+      if (stats && statsGrid) {
+        statsGrid.querySelectorAll("strong")[0].textContent = stats.direct_invites || 0;
+        statsGrid.querySelectorAll("strong")[1].textContent = stats.total_downstream || 0;
+        statsGrid.querySelectorAll("strong")[2].textContent = `${(stats.total_rewards?.amount || 0) / 10000} BLUX`;
+      }
+      await refreshPassportAndUpvotes(sessionAccount, stats);
+      await refreshReferralList(sessionAccount);
+      renderOnboarding();
+    }
+  } catch (err) {
+    console.error('Auto-session init failed:', err.message);
+    // Silently fail; user can click connect if needed
+  }
+}
+
 async function transact(actions) {
+  console.log('Transact called with actions:', actions);
   await ensureSigner();
   if (!signer) {
     throw new Error("No signer available");
-  }
-  if (signer.kind === "esr") {
-    const res = await signer.transact({ actions });
-    lastEsrPayload = res;
-    return res;
   }
   return signer.transact({ actions });
 }
@@ -355,9 +343,6 @@ function setNetwork(kind) {
     localStorage.setItem("network", kind);
   }
   const net = currentNetwork();
-  if (window.esrHelper && typeof window.esrHelper.setNetwork === "function") {
-    window.esrHelper.setNetwork({ chainId: net.chainId, rpcEndpoint: net.rpc });
-  }
   rpc = null;
   signer = null;
   sessionAccount = null;
@@ -451,7 +436,6 @@ async function refreshReferralList(account) {
 
 document.addEventListener("DOMContentLoaded", () => {
   const connectBtn = document.getElementById("connectBtn");
-  const signerSelect = document.getElementById("signerSelect");
   const networkSelect = document.getElementById("networkSelect");
   const customRpcInput = document.getElementById("customRpc");
   const customChainIdInput = document.getElementById("customChainId");
@@ -475,15 +459,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const bridgeStatus = document.getElementById("bridgeStatus");
   const onboardingNextBtn = document.getElementById("onboardingNext");
   const onboardingResetBtn = document.getElementById("onboardingReset");
-  const esrUriField = document.getElementById("esrUri");
-  const esrDeepLinkField = document.getElementById("esrDeepLink");
-  const esrStatus = document.getElementById("esrStatus");
-  const esrOpenBtn = document.getElementById("openEsr");
-
-  if (signerSelect && typeof localStorage !== "undefined") {
-    const pref = localStorage.getItem("signerPreference");
-    if (pref) signerSelect.value = pref;
-  }
   upvoteBtnEl = upvoteBtn;
   upvoteStatusEl = upvoteStatus;
   upvoteMeterFillEl = upvoteMeter;
@@ -492,18 +467,6 @@ document.addEventListener("DOMContentLoaded", () => {
   passportBadgeEl = passportBadge;
   passportHintEl = passportHint;
   renderPassportLevel(sessionDidLevel || 0);
-
-  esrCallbackData = parseEsrCallbackAndClear();
-  if (esrCallbackData?.account) {
-    sessionAccount = esrCallbackData.account;
-    selectedSignerKind = "esr";
-    if (signerSelect) signerSelect.value = "esr";
-    if (inviteCode) inviteCode.value = sessionAccount;
-    setHint(inviteResult, `Tonomy callback received for ${sessionAccount}`, true);
-  }
-  if (esrCallbackData?.request) {
-    updateEsrOutputs(esrCallbackData, "ESR callback received.");
-  }
 
   if (networkSelect) {
     networkSelect.value = selectedNetwork;
@@ -545,23 +508,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   connectBtn?.addEventListener("click", async () => {
     try {
-      selectedSignerKind = signerSelect?.value || "auto";
-      if (typeof localStorage !== "undefined") {
-        localStorage.setItem("signerPreference", selectedSignerKind);
-      }
       signer = null;
       sessionAccount = null;
       sessionDidLevel = 0;
 
       await ensureSigner();
-
-      if (signer.kind === "esr") {
-        updateEsrOutputs(lastEsrPayload, "ESR link generated. Open in Tonomy to complete sign-in.");
-        if (!sessionAccount) {
-          setHint(inviteResult, "Waiting for Tonomy callback to confirm account...");
-          return;
-        }
-      }
 
       if (sessionAccount) {
         const stats = await getUserStats(sessionAccount);
@@ -591,17 +542,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const inviter = inviteCode.value.trim() || sessionAccount;
       const invited = inviteTarget.value.trim();
 
-      const txResult = await transact([{
+      await transact([{
         account: "invite.cxc",
         name: "sendinvite",
         authorization: [{ actor: inviter, permission: "active" }],
         data: { inviter, invited }
       }]);
-
-      if (signer.kind === "esr") {
-        updateEsrOutputs(txResult, `Open in Tonomy to sign invite for ${invited}.`);
-        return;
-      }
 
       const row = await getInviteStatus(invited);
       setHint(inviteResult, row ? "Invite recorded on-chain." : "Invite sent.", true);
@@ -615,16 +561,12 @@ document.addEventListener("DOMContentLoaded", () => {
       setHint(upvoteStatus, "Claiming upvotes...");
       await ensureSigner();
       const user = inviteCode.value.trim() || sessionAccount;
-      const txResult = await transact([{
+      await transact([{
         account: "invite.cxc",
         name: "claimdaily",
         authorization: [{ actor: user, permission: "active" }],
         data: { user }
       }]);
-      if (signer.kind === "esr") {
-        updateEsrOutputs(txResult, "Open in Tonomy to sign daily upvotes.");
-        return;
-      }
       await refreshPassportAndUpvotes(user);
       setHint(upvoteStatus, "Daily upvotes claimed", true);
     } catch (err) {
@@ -696,15 +638,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     } catch (err) {
       setHint(bridgeStatus, `Error: ${err.message}`);
-    }
-  });
-
-  esrOpenBtn?.addEventListener("click", () => {
-    const link = esrDeepLinkField?.value;
-    if (link) {
-      window.location.href = link;
-    } else if (esrStatus) {
-      setHint(esrStatus, "No ESR deep link available. Choose ESR and connect to generate one.");
     }
   });
 

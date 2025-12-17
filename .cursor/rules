@@ -1,0 +1,56 @@
+# cXc Pangea UI rules
+
+## Smart contract integration
+
+### invite.cxc (current UI wiring)
+- sendinvite(inviter: name, invited: name)
+  - Inviter sends an invite for a new user.
+- claimdaily(user: name)
+  - Claims the daily upvote allocation for the user.
+
+Tables observed in UI reads:
+- userstats
+  - Fields used: verification_level, direct_invites, total_downstream, total_rewards.amount
+- invites
+  - Fields used: invited, status/state, claimed/accepted, inviter (secondary index)
+- upvotes
+  - Fields used: daily_upvotes, upvotes_used_today, next_reset/reset_time/reset_at/resets_at
+
+Notes:
+- Upvote math and limits are contract-managed. UI only displays values.
+- Use eosjs JsonRpc table reads, no client-side calculations.
+
+### TonomyInvite (reference ABI: currentxchange/TonomyInvite contract/invitono.abi)
+- redeeminvite(user: name, inviter: name)
+  - Register a new user with an inviter code.
+- claimreward(user: name)
+  - Claim referral rewards based on score.
+- setconfig(admin, min_age_days, rate_seconds, enabled, max_depth, multiplier, token_contract, reward_symbol, reward_rate)
+  - Admin configuration (not exposed in UI).
+- deleteuser(user: name)
+  - Dev/admin utility (not exposed in UI).
+
+Tables:
+- adopters (account, invitedby, lastupdated, score, claimed)
+- config (min_account_age_days, invite_rate_seconds, enabled, admin, max_referral_depth, multiplier, token_contract, reward_symbol, reward_rate)
+- stats (total_referrals, total_users, last_registered)
+
+If invite.cxc matches invitono.abi, align UI actions and table reads accordingly.
+
+### bridge.cxc
+- WAX action: lockwax(from: name, quantity: asset, tonomy_account: name, memo: string)
+- Tonomy table: bridge_transfers
+  - Fields used: memo, status/state/bridge_status, quantity/amount/value, wax_account/from, tonomy_account/to, txid/trx_id, wax_trxid/wax_txid, stage/bridge_stage
+
+## Authentication
+- Tonomy ID SDK only (mobile-first).
+- Connect button runs tonomy.login(); do not use ESR or paste codes.
+
+## CSS and UI
+- Load `cxc-world-main.css` and `cxc-world-responsive.css` from cxc.world.
+- Keep local overrides in `style.css` to match the cxc.world dark, translucent aesthetic.
+- Mobile-first layout; avoid fixed-position elements that block small screens.
+
+## Network config
+- RPC/chainId are set in `app.js` for Pangea, EOS, and Jungle presets.
+- Custom RPC and chainId are supported via `networkSelect`.

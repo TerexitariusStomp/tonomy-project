@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>cXc Pangea Integration</title>
   <!-- Updated for GitHub Pages deployment -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:400,600,700&display=swap">
+  <link rel="stylesheet" href="./cxc-world-main.css">
+  <link rel="stylesheet" href="./cxc-world-responsive.css">
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
@@ -22,32 +25,9 @@
       </select>
       <input id="customRpc" class="hidden" placeholder="Custom RPC" />
       <input id="customChainId" class="hidden" placeholder="Custom Chain ID" />
-      <select id="signerSelect">
-        <option value="auto">Auto: Tonomy / Anchor</option>
-        <option value="tonomy">Tonomy ID</option>
-        <option value="esr">Tonomy ESR (Deep Link)</option>
-        <option value="anchor">Anchor Link</option>
-      </select>
     </div>
-    <button id="connectBtn" class="btn primary">Connect</button>
+    <button id="connectBtn" class="btn primary">Connect with Tonomy</button>
   </header>
-
-  <section class="card" id="esrCard">
-    <h2>ESR Deep Link</h2>
-    <p>Generate a deep link or QR-ready URI for Tonomy Wallet when using ESR mode.</p>
-    <div class="grid">
-      <div>
-        <label>Latest ESR URI</label>
-        <textarea id="esrUri" readonly placeholder="Generated ESR URI will appear here"></textarea>
-      </div>
-      <div>
-        <label>Deep Link (opens Tonomy)</label>
-        <input id="esrDeepLink" readonly placeholder="tonomy://sign?request=..." />
-        <button id="openEsr" class="btn secondary">Open in Tonomy</button>
-      </div>
-    </div>
-    <div id="esrStatus" class="hint"></div>
-  </section>
 
   <main>
     <section class="card">
@@ -87,7 +67,7 @@
         <h2>Passport & Daily Upvotes</h2>
         <p>Claim daily upvotes based on your Passport verification level.</p>
         <div class="pill" id="passportBadge">Passport level 0</div>
-        <div id="passportHint" class="hint">Connect with Tonomy or Anchor to load your level.</div>
+        <div id="passportHint" class="hint">Connect with Tonomy to load your level.</div>
         <button id="claimUpvotes" class="btn primary">Claim Daily Upvotes</button>
         <div id="upvoteStatus" class="hint"></div>
       </div>
@@ -144,69 +124,13 @@
   </main>
 
   <!-- eosjs globals for browser usage -->
-  <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jsonrpc.min.js" integrity="sha256-Zl7UsYjx3MHJb2i2McOMnvou+EGb/R58jFb3QaJbxV4=" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jssig.min.js" integrity="sha256-N3WFw9XcGO2YsQg8oqwiCB3Up5Zdwqs7GgZvs8o+pZk=" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-api.min.js" integrity="sha256-+11QtS9v0XR3p4cLrdu/kHzKf6Mr7R/4BIqwl2fv9H4=" crossorigin="anonymous"></script>
-  <!-- Anchor Link + Tonomy ID SDK globals for browser usage -->
+  <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jsonrpc.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jssig.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-api.min.js" crossorigin="anonymous"></script>
+  <!-- Tonomy ID SDK global for browser usage -->
   <script type="module">
-    import AnchorLink from "https://cdn.jsdelivr.net/npm/anchor-link@3.5.1/dist/anchorlink.browser.esm.js";
-    import AnchorLinkBrowserTransport from "https://cdn.jsdelivr.net/npm/anchor-link-browser-transport@3.5.1/dist/anchorlink-browser-transport.browser.esm.js";
     import { createTonomyId } from "https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@0.6.2/dist/tonomy-id-sdk.esm.js";
-    window.AnchorLink = AnchorLink;
-    window.AnchorLinkBrowserTransport = AnchorLinkBrowserTransport;
     window.createTonomyId = createTonomyId;
-  </script>
-  <script type="module">
-    import { SigningRequest } from "https://cdn.jsdelivr.net/npm/@wharfkit/signing-request/+esm";
-    import { APIClient } from "https://cdn.jsdelivr.net/npm/@wharfkit/antelope/+esm";
-    import { ABICache } from "https://cdn.jsdelivr.net/npm/@wharfkit/abicache/+esm";
-    import pako from "https://cdn.jsdelivr.net/npm/pako@2/+esm";
-
-    let currentChainId = "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3d119416cf6838fb94c5a37a";
-    let currentRpc = "https://eos.greymass.com";
-    let client = new APIClient({ url: currentRpc });
-    let abiCache = new ABICache(client);
-
-    function setNetwork({ chainId, rpcEndpoint }) {
-      currentChainId = chainId || currentChainId;
-      currentRpc = rpcEndpoint || currentRpc;
-      client = new APIClient({ url: currentRpc });
-      abiCache = new ABICache(client);
-    }
-
-    async function createEsr(actions, options = {}) {
-      const request = await SigningRequest.create(
-        {
-          actions,
-          broadcast: options.broadcast !== false,
-          callback: options.callback,
-          chainId: options.chainId || currentChainId,
-        },
-        { abiProvider: abiCache, zlib: pako }
-      );
-      return request.encode(true, true, "esr");
-    }
-
-    async function createIdentityEsr(callbackUrl) {
-      const request = SigningRequest.identity({ callback: callbackUrl });
-      return request.encode(true, true, "esr");
-    }
-
-    async function resolveEsr(esrUri, signerAccount, signerPermission = "active") {
-      const request = SigningRequest.from(esrUri, { abiProvider: abiCache, zlib: pako });
-      const abis = await request.fetchAbis();
-      const info = await client.v1.chain.get_info();
-      const header = info.getTransactionHeader();
-      const authorization = { actor: signerAccount, permission: signerPermission };
-      const resolved = await request.resolve(abis, authorization, header);
-      return {
-        transaction: resolved.transaction,
-        serializedTransaction: resolved.serializedTransaction,
-        signingDigest: resolved.signingDigest,
-      };
-    }
-
-    window.esrHelper = { createEsr, createIdentityEsr, resolveEsr, client: () => client, setNetwork };
   </script>
   <script type="module" src="./app.js"></script>
 </body>

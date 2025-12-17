@@ -1,6 +1,8 @@
 ESR Integration Guide (Tonomy Wallet)
 =====================================
 
+Note: The current UI uses Tonomy ID login (mobile-first) and does not expose ESR flows. Keep this document for reference only.
+
 This project already supports Tonomy ID (SDK) and Anchor Link via `signer.js`. Use this guide to add ESR (Antelope Signing Request) support so the UI can connect to the Tonomy wallet through deep links or QR codes.
 
 What ESR Does
