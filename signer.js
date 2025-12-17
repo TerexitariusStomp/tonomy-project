@@ -1,6 +1,8 @@
 // Signer adapter supporting Tonomy ID (mobile-first) with optional Anchor fallback.
 // For pure browser usage without bundling, inject window.tonomy or window.createTonomyId.
 
+const TONOMY_APP_ID = "cxc.world";
+
 // Default network targets EOS mainnet; callers can pass a different RPC/chainId (e.g., Pangea).
 const DEFAULT_NETWORK = {
   chainId: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3d119416cf6838fb94c5a37a",
@@ -17,6 +19,11 @@ function normalizeNetwork(network) {
 export function detectSignerPreference() {
   if (typeof window !== "undefined" && (window.tonomy || window.createTonomyId)) return "tonomy";
   return "tonomy";
+}
+
+export function buildTonomyLoginDeepLink(callbackUrl = typeof window !== "undefined" ? window.location.href : "") {
+  const params = new URLSearchParams({ appId: TONOMY_APP_ID, callback: callbackUrl });
+  return `tonomy://login?${params.toString()}`;
 }
 
 export async function createSigner(kind = detectSignerPreference(), network) {
@@ -39,7 +46,7 @@ async function createTonomySigner() {
       }
     }
     tonomy = await createTonomyIdGlobal({
-      appId: "cxc.world",
+      appId: TONOMY_APP_ID,
       callbackUrl: window.location.href,
     });
   }

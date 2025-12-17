@@ -1,6 +1,6 @@
 console.log('app.js loaded');
 
-import { createSigner } from "./signer.js";
+import { buildTonomyLoginDeepLink, createSigner } from "./signer.js";
 import { ExternalUser, setSettings } from "https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@0.6.2/dist/tonomy-id-sdk.esm.js";
 import { JsonRpc } from "https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jsonrpc.esm.js";
 import { JsSignatureProvider } from "https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jssig.esm.js";
@@ -73,6 +73,7 @@ let upvoteCountsEl = null;
 let upvoteResetEl = null;
 let passportBadgeEl = null;
 let passportHintEl = null;
+let qrInstance = null;
 
 function currentNetwork() {
   const preset = NETWORKS[selectedNetwork] || NETWORKS.pangea;
@@ -434,6 +435,28 @@ async function refreshReferralList(account) {
   }
 }
 
+function renderTonomyQr(targetEl, link, statusEl) {
+  if (!targetEl) return;
+  const qrLib = window.QRCode;
+  if (!qrLib) {
+    if (statusEl) setHint(statusEl, "QR code library not loaded.");
+    return;
+  }
+  if (!qrInstance) {
+    qrInstance = new qrLib(targetEl, {
+      text: link,
+      width: 220,
+      height: 220,
+      colorDark: "#ffffff",
+      colorLight: "#121212",
+      correctLevel: qrLib.CorrectLevel.M,
+    });
+  } else {
+    qrInstance.makeCode(link);
+  }
+  if (statusEl) setHint(statusEl, "Scan with the Tonomy wallet to connect.", true);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const connectBtn = document.getElementById("connectBtn");
   const networkSelect = document.getElementById("networkSelect");
@@ -459,6 +482,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const bridgeStatus = document.getElementById("bridgeStatus");
   const onboardingNextBtn = document.getElementById("onboardingNext");
   const onboardingResetBtn = document.getElementById("onboardingReset");
+  const qrBtn = document.getElementById("generateQr");
+  const qrBox = document.getElementById("tonomyQr");
+  const qrLink = document.getElementById("tonomyQrLink");
+  const qrStatus = document.getElementById("tonomyQrStatus");
   upvoteBtnEl = upvoteBtn;
   upvoteStatusEl = upvoteStatus;
   upvoteMeterFillEl = upvoteMeter;
@@ -532,7 +559,18 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     } catch (err) {
       setHint(inviteResult, `Connect error: ${err.message}`);
+      if (qrBox) {
+        const link = buildTonomyLoginDeepLink();
+        if (qrLink) qrLink.value = link;
+        renderTonomyQr(qrBox, link, qrStatus);
+      }
     }
+  });
+
+  qrBtn?.addEventListener("click", () => {
+    const link = buildTonomyLoginDeepLink();
+    if (qrLink) qrLink.value = link;
+    renderTonomyQr(qrBox, link, qrStatus);
   });
 
   inviteBtn.addEventListener("click", async () => {

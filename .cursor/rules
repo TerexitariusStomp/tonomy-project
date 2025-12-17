@@ -45,6 +45,7 @@ If invite.cxc matches invitono.abi, align UI actions and table reads accordingly
 ## Authentication
 - Tonomy ID SDK only (mobile-first).
 - Connect button runs tonomy.login(); do not use ESR or paste codes.
+- QR login uses deep link format: `tonomy://login?appId=cxc.world&callback=<url>`.
 
 ## CSS and UI
 - Load `cxc-world-main.css` and `cxc-world-responsive.css` from cxc.world.

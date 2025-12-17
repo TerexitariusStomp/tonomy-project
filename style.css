@@ -59,6 +59,10 @@ main {
   padding: 20px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
 }
+#qrCard {
+  max-width: 980px;
+  margin: 24px auto 0;
+}
 .two-column {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -68,6 +72,29 @@ main {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
+}
+.qr-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+}
+.qr-box {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 220px;
+  min-height: 220px;
+}
+.qr-box img,
+.qr-box canvas {
+  display: block;
+  max-width: 220px;
+  max-height: 220px;
 }
 label {
   display: block;

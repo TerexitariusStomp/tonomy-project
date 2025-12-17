@@ -29,6 +29,22 @@
     <button id="connectBtn" class="btn primary">Connect with Tonomy</button>
   </header>
 
+  <section class="card" id="qrCard">
+    <h2>Connect via QR</h2>
+    <p>Scan with the Tonomy mobile wallet to connect this session.</p>
+    <div class="grid">
+      <div class="qr-panel">
+        <div id="tonomyQr" class="qr-box"></div>
+      </div>
+      <div>
+        <label>Login deep link</label>
+        <input id="tonomyQrLink" readonly placeholder="tonomy://login?appId=..." />
+        <button id="generateQr" class="btn secondary">Generate QR</button>
+      </div>
+    </div>
+    <div id="tonomyQrStatus" class="hint"></div>
+  </section>
+
   <main>
     <section class="card">
       <h2>Onboarding</h2>
@@ -127,6 +143,7 @@
   <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jsonrpc.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jssig.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-api.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <!-- Tonomy ID SDK global for browser usage -->
   <script type="module">
     import { createTonomyId } from "https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@0.6.2/dist/tonomy-id-sdk.esm.js";
