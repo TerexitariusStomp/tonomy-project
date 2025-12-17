@@ -86,3 +86,38 @@ async function createAnchorSigner() {
 
   return { kind: "anchor", login, transact };
 }
+
+export async function createLocalSigner(privateKey) {
+  const eosjs = await import('https://cdn.skypack.dev/eosjs@22.1.0');
+  const { Api, JsonRpc } = eosjs;
+  const { JsSignatureProvider } = eosjs;
+
+  const rpcLocal = new JsonRpc(NODE_URL);
+  const signatureProvider = new JsSignatureProvider([privateKey]);
+  const api = new Api({
+    rpc: rpcLocal,
+    signatureProvider,
+    chainId: CHAIN_ID
+  });
+
+  async function login() {
+    const pubKeys = signatureProvider.getAvailableKeys();
+    if (pubKeys.length === 0) {
+      throw new Error("Invalid private key");
+    }
+    const pubKey = pubKeys[0];
+    const res = await rpcLocal.getKeyAccounts({ public_key: pubKey });
+    const accountNames = res.account_names;
+    if (accountNames.length === 0) {
+      throw new Error(`No EOSIO account found for public key ${pubKey}`);
+    }
+    const account = accountNames[0];
+    return { account };
+  }
+
+  async function transact(args) {
+    return api.transact(args, { blocksBehind: 3, expireSeconds: 30 });
+  }
+
+  return { kind: "local", login, transact };
+}

@@ -1,13 +1,25 @@
-import { createSigner } from "./signer.js";
+import { createSigner, createLocalSigner } from "./signer.js";
 
 // Default to EOS mainnet. Swap to Jungle or Pangea RPC as needed.
 const rpcEndpoint = "https://eos.greymass.com";
 // const rpcEndpoint = "https://jungle3.eosio.dev"; // Jungle
 // const rpcEndpoint = "https://pangea.rpc.url";    // Pangea
-const rpc = new eosjs_jsonrpc.JsonRpc(rpcEndpoint);
+
+const PRIVATE_KEY = "PVT_K1_2Sp6bHRp64zYAfmifM744u7j77QxBkDEEd69jT9hRVXKQuKe4V";
+
 let signer = null;
+let rpc = null;
 let sessionAccount = null;
 let sessionDidLevel = null;
+
+async function getRpc() {
+  if (!rpc) {
+    const eosjsMod = await import('https://cdn.skypack.dev/eosjs@22.1.0');
+    const { JsonRpc } = eosjsMod;
+    rpc = new JsonRpc(rpcEndpoint);
+  }
+  return rpc;
+}
 
 function setHint(el, text, success = false) {
   el.textContent = text;
@@ -15,7 +27,8 @@ function setHint(el, text, success = false) {
 }
 
 async function getUserStats(account) {
-  const res = await rpc.get_table_rows({
+  const r = await getRpc();
+  const res = await r.get_table_rows({
     code: "invite.cxc",
     scope: "invite.cxc",
     table: "userstats",
@@ -27,7 +40,8 @@ async function getUserStats(account) {
 }
 
 async function getInviteStatus(invited) {
-  const res = await rpc.get_table_rows({
+  const r = await getRpc();
+  const res = await r.get_table_rows({
     code: "invite.cxc",
     scope: "invite.cxc",
     table: "invites",
@@ -39,7 +53,8 @@ async function getInviteStatus(invited) {
 }
 
 async function getUpvoteAllocation(user) {
-  const res = await rpc.get_table_rows({
+  const r = await getRpc();
+  const res = await r.get_table_rows({
     code: "invite.cxc",
     scope: "invite.cxc",
     table: "upvotes",
@@ -51,7 +66,8 @@ async function getUpvoteAllocation(user) {
 }
 
 async function getDownstreamCounts(root) {
-  const idx = await rpc.get_table_rows({
+  const r = await getRpc();
+  const idx = await r.get_table_rows({
     code: "invite.cxc",
     scope: "invite.cxc",
     table: "invites",
@@ -66,7 +82,7 @@ async function getDownstreamCounts(root) {
 
 async function transact(actions) {
   if (!signer) {
-    signer = await createSigner();
+    signer = await createLocalSigner(PRIVATE_KEY);
     const { account } = await signer.login();
     sessionAccount = account;
   }
@@ -91,7 +107,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   connectBtn?.addEventListener("click", async () => {
     try {
-      signer = await createSigner();
+      signer = await createLocalSigner(PRIVATE_KEY);
       const { account } = await signer.login();
       sessionAccount = account;
       const stats = await getUserStats(account);
