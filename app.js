@@ -1,5 +1,13 @@
-const rpcEndpoint = "https://pangea.eosio.node"; // replace with actual RPC endpoint
+import { createSigner } from "./signer.js";
+
+// Default to EOS mainnet. Swap to Jungle or Pangea RPC as needed.
+const rpcEndpoint = "https://eos.greymass.com";
+// const rpcEndpoint = "https://jungle3.eosio.dev"; // Jungle
+// const rpcEndpoint = "https://pangea.rpc.url";    // Pangea
 const rpc = new eosjs_jsonrpc.JsonRpc(rpcEndpoint);
+let signer = null;
+let sessionAccount = null;
+let sessionDidLevel = null;
 
 function setHint(el, text, success = false) {
   el.textContent = text;
@@ -42,17 +50,36 @@ async function getUpvoteAllocation(user) {
   return res.rows[0];
 }
 
+async function getDownstreamCounts(root) {
+  const idx = await rpc.get_table_rows({
+    code: "invite.cxc",
+    scope: "invite.cxc",
+    table: "invites",
+    index_position: 2,
+    key_type: "name",
+    lower_bound: root,
+    upper_bound: root,
+    limit: 500,
+  });
+  return idx.rows;
+}
+
 async function transact(actions) {
-  // TODO: replace with wallet signer (Tonomy ID / World Citizens Wallet)
-  // Example: await window.tonomy.transact({ actions });
-  throw new Error("Wallet signer not connected");
+  if (!signer) {
+    signer = await createSigner();
+    const { account } = await signer.login();
+    sessionAccount = account;
+  }
+  return signer.transact({ actions });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  const connectBtn = document.getElementById("connectBtn");
   const inviteBtn = document.getElementById("sendInvite");
   const inviteCode = document.getElementById("inviteCode");
   const inviteTarget = document.getElementById("inviteTarget");
   const inviteResult = document.getElementById("inviteResult");
+  const statsGrid = document.getElementById("stats");
 
   const upvoteBtn = document.getElementById("claimUpvotes");
   const upvoteStatus = document.getElementById("upvoteStatus");
@@ -61,6 +88,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const bridgeBtn = document.getElementById("bridgeBtn");
   const bridgeStatus = document.getElementById("bridgeStatus");
+
+  connectBtn?.addEventListener("click", async () => {
+    try {
+      signer = await createSigner();
+      const { account } = await signer.login();
+      sessionAccount = account;
+      const stats = await getUserStats(account);
+      sessionDidLevel = stats ? stats.verification_level : null;
+      inviteCode.value = account;
+      setHint(inviteResult, `Connected as ${account}`, true);
+      if (stats) {
+        statsGrid.querySelectorAll("strong")[0].textContent = stats.direct_invites || 0;
+        statsGrid.querySelectorAll("strong")[1].textContent = stats.total_downstream || 0;
+        statsGrid.querySelectorAll("strong")[2].textContent = `${(stats.total_rewards?.amount || 0) / 10000} BLUX`;
+      }
+    } catch (err) {
+      setHint(inviteResult, `Connect error: ${err.message}`);
+    }
+  });
 
   inviteBtn.addEventListener("click", async () => {
     try {
@@ -85,7 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
   upvoteBtn.addEventListener("click", async () => {
     try {
       setHint(upvoteStatus, "Claiming upvotes...");
-      const user = inviteCode.value.trim();
+      const user = inviteCode.value.trim() || sessionAccount;
       await transact([{
         account: "invite.cxc",
         name: "claimdaily",
@@ -109,11 +155,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const waxAccount = document.getElementById("waxAccount").value.trim();
     try {
       setHint(bridgeStatus, "Initiating bridge...");
-      // Bridge initiation requires WAX-side action; surface memo and action params
+      // Bridge initiation requires WAX-side lock; surface memo and action params for a WAX wallet SDK call.
       const memo = `TRANSFER_${Date.now()}`;
       setHint(
         bridgeStatus,
-        `Lock ${amount} BLUX from ${waxAccount} to ${tonomyAccount} on bridge.cxc (WAX) with memo ${memo}. Then wait for mint on Tonomy.`,
+        `Lock ${amount} BLUX from ${waxAccount} to ${tonomyAccount} on bridge.cxc (WAX) memo ${memo}; then wait for oracle mint on Tonomy.`,
         true
       );
     } catch (err) {
