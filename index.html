@@ -91,6 +91,15 @@
   <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jsonrpc.min.js" integrity="sha256-Zl7UsYjx3MHJb2i2McOMnvou+EGb/R58jFb3QaJbxV4=" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jssig.min.js" integrity="sha256-N3WFw9XcGO2YsQg8oqwiCB3Up5Zdwqs7GgZvs8o+pZk=" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-api.min.js" integrity="sha256-+11QtS9v0XR3p4cLrdu/kHzKf6Mr7R/4BIqwl2fv9H4=" crossorigin="anonymous"></script>
+  <!-- Anchor Link + Tonomy ID SDK globals for browser usage -->
+  <script type="module">
+    import AnchorLink from "https://cdn.jsdelivr.net/npm/anchor-link@3.5.1/dist/anchorlink.browser.esm.js";
+    import AnchorLinkBrowserTransport from "https://cdn.jsdelivr.net/npm/anchor-link-browser-transport@3.5.1/dist/anchorlink-browser-transport.browser.esm.js";
+    import { createTonomyId } from "https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@0.6.2/dist/tonomy-id-sdk.esm.js";
+    window.AnchorLink = AnchorLink;
+    window.AnchorLinkBrowserTransport = AnchorLinkBrowserTransport;
+    window.createTonomyId = createTonomyId;
+  </script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

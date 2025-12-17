@@ -25,16 +25,15 @@ export async function createSigner(kind = detectSignerPreference()) {
 async function createTonomySigner() {
   let tonomy = window.tonomy;
   if (!tonomy) {
-    // Attempt dynamic import (requires bundler)
-    try {
-      const mod = await import("@tonomy/tonomy-id-sdk");
-      tonomy = await mod.createTonomyId({
-        appId: "cxc.world",
-        callbackUrl: window.location.href,
-      });
-    } catch (e) {
+    // Use injected createTonomyId if present (loaded via CDN), otherwise fail fast.
+    const createTonomyIdGlobal = window.createTonomyId;
+    if (!createTonomyIdGlobal) {
       throw new Error("Tonomy ID SDK not injected. Bundle @tonomy/tonomy-id-sdk or open via Tonomy app.");
     }
+    tonomy = await createTonomyIdGlobal({
+      appId: "cxc.world",
+      callbackUrl: window.location.href,
+    });
   }
 
   async function login() {
@@ -53,14 +52,7 @@ async function createAnchorSigner() {
   let AnchorLink = window.AnchorLink;
   let AnchorLinkBrowserTransport = window.AnchorLinkBrowserTransport;
   if (!AnchorLink || !AnchorLinkBrowserTransport) {
-    try {
-      const mod = await import("anchor-link");
-      const transportMod = await import("anchor-link-browser-transport");
-      AnchorLink = mod.default || mod;
-      AnchorLinkBrowserTransport = transportMod.default || transportMod;
-    } catch (e) {
-      throw new Error("Anchor Link not available. Bundle anchor-link and anchor-link-browser-transport or inject via window.");
-    }
+    throw new Error("Anchor Link not available. Bundle anchor-link and anchor-link-browser-transport or inject via window.");
   }
 
   const transport = new AnchorLinkBrowserTransport();
