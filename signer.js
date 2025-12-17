@@ -29,7 +29,7 @@ async function createTonomySigner() {
     let createTonomyIdGlobal = window.createTonomyId;
     if (!createTonomyIdGlobal) {
       try {
-        const mod = await import("https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@0.6.2/dist/tonomy-id-sdk.esm.js");
+        const mod = await import("https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@0.6.2/+esm");
         createTonomyIdGlobal = mod.createTonomyId || mod.default;
       } catch (e) {
         throw new Error("Tonomy ID SDK not injected. Bundle @tonomy/tonomy-id-sdk or open via Tonomy app.");
@@ -58,8 +58,8 @@ async function createAnchorSigner() {
   let AnchorLinkBrowserTransport = window.AnchorLinkBrowserTransport;
   if (!AnchorLink || !AnchorLinkBrowserTransport) {
     try {
-      const linkMod = await import("https://cdn.jsdelivr.net/npm/anchor-link@3.5.1/dist/anchorlink.browser.esm.js");
-      const transportMod = await import("https://cdn.jsdelivr.net/npm/anchor-link-browser-transport@3.5.1/dist/anchorlink-browser-transport.browser.esm.js");
+      const linkMod = await import("https://cdn.jsdelivr.net/npm/anchor-link@3.5.1/+esm");
+      const transportMod = await import("https://cdn.jsdelivr.net/npm/anchor-link-browser-transport@3.5.1/+esm");
       AnchorLink = linkMod.default || linkMod;
       AnchorLinkBrowserTransport = transportMod.default || transportMod;
     } catch (e) {
