@@ -14,16 +14,53 @@
       <span class="subtitle">Pangea Passport</span>
     </div>
     <div class="auth-controls">
+      <select id="networkSelect">
+        <option value="pangea">Pangea (Tonomy)</option>
+        <option value="eos">EOS Mainnet</option>
+        <option value="jungle">Jungle</option>
+        <option value="custom">Custom</option>
+      </select>
+      <input id="customRpc" class="hidden" placeholder="Custom RPC" />
+      <input id="customChainId" class="hidden" placeholder="Custom Chain ID" />
       <select id="signerSelect">
         <option value="auto">Auto: Tonomy / Anchor</option>
         <option value="tonomy">Tonomy ID</option>
+        <option value="esr">Tonomy ESR (Deep Link)</option>
         <option value="anchor">Anchor Link</option>
       </select>
     </div>
     <button id="connectBtn" class="btn primary">Connect</button>
   </header>
 
+  <section class="card" id="esrCard">
+    <h2>ESR Deep Link</h2>
+    <p>Generate a deep link or QR-ready URI for Tonomy Wallet when using ESR mode.</p>
+    <div class="grid">
+      <div>
+        <label>Latest ESR URI</label>
+        <textarea id="esrUri" readonly placeholder="Generated ESR URI will appear here"></textarea>
+      </div>
+      <div>
+        <label>Deep Link (opens Tonomy)</label>
+        <input id="esrDeepLink" readonly placeholder="tonomy://sign?request=..." />
+        <button id="openEsr" class="btn secondary">Open in Tonomy</button>
+      </div>
+    </div>
+    <div id="esrStatus" class="hint"></div>
+  </section>
+
   <main>
+    <section class="card">
+      <h2>Onboarding</h2>
+      <p>Resume the guided flow: welcome -> create account -> invite code -> verification -> tutorial.</p>
+      <div id="onboardingList" class="step-list"></div>
+      <div class="actions">
+        <button id="onboardingNext" class="btn primary">Next step</button>
+        <button id="onboardingReset" class="btn secondary">Restart</button>
+        <span id="onboardingStatus" class="hint"></span>
+      </div>
+    </section>
+
     <section class="card two-column">
       <div>
         <h2>Invite Friends</h2>
@@ -62,7 +99,19 @@
     </section>
 
     <section class="card">
-      <h2>Bridge BLUX: WAX → Tonomy</h2>
+      <h2>Referral Dashboard</h2>
+      <p>Track downstream invites and invite status.</p>
+      <div id="referralTotals" class="hint">Connect to load referrals.</div>
+      <div id="referralList" class="list-box">—</div>
+    </section>
+
+    <section class="card">
+      <h2>Bridge BLUX: WAX -> Tonomy</h2>
+      <div id="bridgeStepper" class="stepper">
+        <div class="step" data-step="memo"><div class="badge">1</div><div>Generate memo</div></div>
+        <div class="step" data-step="lock"><div class="badge">2</div><div>Lock on WAX</div></div>
+        <div class="step" data-step="mint"><div class="badge">3</div><div>Mint on Tonomy</div></div>
+      </div>
       <div class="grid">
         <div>
           <label>Amount (BLUX)</label>
@@ -83,6 +132,10 @@
       </div>
       <button id="bridgeBtn" class="btn primary">Bridge Tokens</button>
       <button id="bridgeCheckBtn" class="btn secondary">Check Bridge Status</button>
+      <div class="hint">
+        Explorer: <a id="bridgeExplorerWax" class="hidden" target="_blank" rel="noreferrer">WAX tx</a>
+        <a id="bridgeExplorerTonomy" class="hidden" target="_blank" rel="noreferrer">Tonomy tx</a>
+      </div>
       <div id="bridgeStatus" class="hint"></div>
     </section>
   </main>
@@ -99,6 +152,58 @@
     window.AnchorLink = AnchorLink;
     window.AnchorLinkBrowserTransport = AnchorLinkBrowserTransport;
     window.createTonomyId = createTonomyId;
+  </script>
+  <script type="module">
+    import { SigningRequest } from "https://cdn.jsdelivr.net/npm/@wharfkit/signing-request/+esm";
+    import { APIClient } from "https://cdn.jsdelivr.net/npm/@wharfkit/antelope/+esm";
+    import { ABICache } from "https://cdn.jsdelivr.net/npm/@wharfkit/abicache/+esm";
+    import pako from "https://cdn.jsdelivr.net/npm/pako@2/+esm";
+
+    let currentChainId = "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3d119416cf6838fb94c5a37a";
+    let currentRpc = "https://eos.greymass.com";
+    let client = new APIClient({ url: currentRpc });
+    let abiCache = new ABICache(client);
+
+    function setNetwork({ chainId, rpcEndpoint }) {
+      currentChainId = chainId || currentChainId;
+      currentRpc = rpcEndpoint || currentRpc;
+      client = new APIClient({ url: currentRpc });
+      abiCache = new ABICache(client);
+    }
+
+    async function createEsr(actions, options = {}) {
+      const request = await SigningRequest.create(
+        {
+          actions,
+          broadcast: options.broadcast !== false,
+          callback: options.callback,
+          chainId: options.chainId || currentChainId,
+        },
+        { abiProvider: abiCache, zlib: pako }
+      );
+      return request.encode(true, true, "esr");
+    }
+
+    async function createIdentityEsr(callbackUrl) {
+      const request = SigningRequest.identity({ callback: callbackUrl });
+      return request.encode(true, true, "esr");
+    }
+
+    async function resolveEsr(esrUri, signerAccount, signerPermission = "active") {
+      const request = SigningRequest.from(esrUri, { abiProvider: abiCache, zlib: pako });
+      const abis = await request.fetchAbis();
+      const info = await client.v1.chain.get_info();
+      const header = info.getTransactionHeader();
+      const authorization = { actor: signerAccount, permission: signerPermission };
+      const resolved = await request.resolve(abis, authorization, header);
+      return {
+        transaction: resolved.transaction,
+        serializedTransaction: resolved.serializedTransaction,
+        signingDigest: resolved.signingDigest,
+      };
+    }
+
+    window.esrHelper = { createEsr, createIdentityEsr, resolveEsr, client: () => client, setNetwork };
   </script>
   <script type="module" src="./app.js"></script>
 </body>
