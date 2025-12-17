@@ -104,6 +104,7 @@ button.btn {
 .primary { background: linear-gradient(135deg, #ff5c8d, #ff9a5f); }
 .secondary { background: #0f131b; border: 1px solid var(--border); color: var(--text); }
 .btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .hint { margin-top: 8px; color: var(--muted); font-size: 13px; }
 .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .stat-grid div { background: #0f131b; border: 1px solid var(--border); padding: 10px; border-radius: 10px; }
@@ -128,6 +129,7 @@ button.btn {
 .stepper .step { display: inline-flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: #0f131b; }
 .stepper .step.active { border-color: var(--accent); color: #fff; }
 .stepper .step.done { border-color: var(--success); color: var(--success); }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; background: #0f131b; border: 1px solid var(--border); font-weight: 700; margin-bottom: 6px; }
 @media (max-width: 640px) {
   header { flex-direction: column; gap: 8px; align-items: flex-start; }
   .auth-controls { width: 100%; flex-wrap: wrap; }

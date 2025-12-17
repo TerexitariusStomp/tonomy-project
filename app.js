@@ -5,17 +5,20 @@ const NETWORKS = {
   pangea: {
     label: "Pangea (Tonomy)",
     rpc: "https://pangea.rpc.url", // TODO: replace with live Pangea RPC
-    chainId: "PANGEA_CHAIN_ID_HERE"
+    chainId: "PANGEA_CHAIN_ID_HERE",
+    explorerTx: "https://explorer.pangea.url/transaction/"
   },
   eos: {
     label: "EOS Mainnet",
     rpc: "https://eos.greymass.com",
-    chainId: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3d119416cf6838fb94c5a37a"
+    chainId: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3d119416cf6838fb94c5a37a",
+    explorerTx: "https://bloks.io/transaction/"
   },
   jungle: {
     label: "Jungle Testnet",
     rpc: "https://jungle3.eosio.dev",
-    chainId: "73e4385a2708e6d7048834fbc1079f2fabb17b3c125b146af438971e90716c4d"
+    chainId: "73e4385a2708e6d7048834fbc1079f2fabb17b3c125b146af438971e90716c4d",
+    explorerTx: "https://jungle.eosq.eosnation.io/tx/"
   },
   custom: {
     label: "Custom",
@@ -27,6 +30,14 @@ const NETWORKS = {
 const EXPLORERS = {
   waxTx: "https://wax.bloks.io/transaction/",
   tonomyTx: "https://explorer.pangea.url/transaction/" // TODO: replace with live explorer base
+};
+
+const PASSPORT_ALLOWANCES = {
+  0: 0,
+  1: 10,
+  2: 25,
+  3: 50,
+  4: 100
 };
 
 const ONBOARDING_STEPS = [
@@ -52,6 +63,13 @@ let lastBridgeMemo = "";
 let bridgePollHandle = null;
 let lastEsrPayload = null;
 let esrCallbackData = null;
+let upvoteBtnEl = null;
+let upvoteStatusEl = null;
+let upvoteMeterFillEl = null;
+let upvoteCountsEl = null;
+let upvoteResetEl = null;
+let passportBadgeEl = null;
+let passportHintEl = null;
 
 function currentNetwork() {
   const preset = NETWORKS[selectedNetwork] || NETWORKS.pangea;
@@ -60,9 +78,14 @@ function currentNetwork() {
       label: preset.label,
       rpc: customNetwork.rpc || NETWORKS.pangea.rpc,
       chainId: customNetwork.chainId || NETWORKS.pangea.chainId,
+      explorerTx: customNetwork.explorerTx || NETWORKS.pangea.explorerTx,
     };
   }
   return preset;
+}
+
+function tonomyExplorerBase() {
+  return currentNetwork().explorerTx || EXPLORERS.tonomyTx;
 }
 
 async function getRpc() {
@@ -76,6 +99,40 @@ async function getRpc() {
 function setHint(el, text, success = false) {
   el.textContent = text;
   el.style.color = success ? "#3ecf8e" : "#9aa3b5";
+}
+
+function deriveAllowance(level) {
+  const lvl = typeof level === "number" ? level : Number(level) || 0;
+  return PASSPORT_ALLOWANCES.hasOwnProperty(lvl) ? PASSPORT_ALLOWANCES[lvl] : PASSPORT_ALLOWANCES[0];
+}
+
+function formatResetCountdown(date) {
+  if (!date) return "";
+  const target = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(target.getTime())) return "";
+  const diffMs = target.getTime() - Date.now();
+  if (diffMs <= 0) return "Resets soon";
+  const hours = Math.floor(diffMs / 3600000);
+  const mins = Math.floor((diffMs % 3600000) / 60000);
+  if (hours > 0) return `${hours}h ${mins}m until reset`;
+  return `${mins}m until reset`;
+}
+
+function estimateResetTime(allocRow) {
+  const raw =
+    allocRow?.next_reset ||
+    allocRow?.reset_time ||
+    allocRow?.reset_at ||
+    allocRow?.resets_at ||
+    allocRow?.reset;
+  if (raw) {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  const now = new Date();
+  const fallback = new Date(now);
+  fallback.setHours(24, 0, 0, 0);
+  return fallback;
 }
 
 function updateEsrOutputs(payload, msg) {
@@ -140,6 +197,65 @@ async function getDownstreamCounts(root) {
     limit: 500,
   });
   return idx.rows;
+}
+
+function renderPassportLevel(level) {
+  const lvl = typeof level === "number" ? level : Number(level) || 0;
+  if (passportBadgeEl) {
+    passportBadgeEl.textContent = `Passport level ${lvl}`;
+  }
+  if (passportHintEl) {
+    const base = deriveAllowance(lvl);
+    passportHintEl.textContent = lvl
+      ? `Level ${lvl} detected. Base allowance ${base} upvotes/day.`
+      : "Connect with Tonomy or Anchor to load your level.";
+  }
+}
+
+function renderUpvoteAllocation(allocRow, level) {
+  const totalRaw = allocRow?.daily_upvotes;
+  const total =
+    typeof totalRaw === "number" ? totalRaw : Number(totalRaw) || deriveAllowance(level);
+  const usedRaw = allocRow?.upvotes_used_today;
+  const used = typeof usedRaw === "number" ? usedRaw : Number(usedRaw) || 0;
+  const remaining = Math.max(total - used, 0);
+  if (upvoteMeterFillEl) {
+    upvoteMeterFillEl.style.width = total ? `${(remaining / total) * 100}%` : "0%";
+  }
+  if (upvoteCountsEl) {
+    upvoteCountsEl.textContent = `${remaining} / ${total} upvotes`;
+  }
+  if (upvoteResetEl) {
+    const resetDate = estimateResetTime(allocRow);
+    const label = formatResetCountdown(resetDate);
+    upvoteResetEl.textContent = label || "Reset time not available";
+  }
+  if (upvoteBtnEl) {
+    upvoteBtnEl.disabled = total === 0 || remaining <= 0;
+  }
+  if (upvoteStatusEl && (total === 0 || remaining <= 0)) {
+    const msg =
+      total === 0
+        ? "No daily upvote allocation for this passport level yet."
+        : "Out of upvotes. Wait for reset or level up your passport.";
+    setHint(upvoteStatusEl, msg);
+  }
+  return { total, remaining, used };
+}
+
+async function refreshPassportAndUpvotes(account, stats) {
+  if (!account) return { stats: null, alloc: null };
+  const userStats = stats || (await getUserStats(account));
+  sessionDidLevel = userStats?.verification_level ?? sessionDidLevel ?? 0;
+  renderPassportLevel(sessionDidLevel);
+  try {
+    const alloc = await getUpvoteAllocation(account);
+    renderUpvoteAllocation(alloc, sessionDidLevel);
+    return { stats: userStats, alloc };
+  } catch (err) {
+    if (upvoteStatusEl) setHint(upvoteStatusEl, `Could not load allocation: ${err.message}`);
+    return { stats: userStats, alloc: null };
+  }
 }
 
 function parseEsrCallbackAndClear() {
@@ -245,7 +361,7 @@ function setNetwork(kind) {
   rpc = null;
   signer = null;
   sessionAccount = null;
-  sessionDidLevel = null;
+  sessionDidLevel = 0;
 }
 
 function stopBridgePolling() {
@@ -281,6 +397,29 @@ function setBridgeExplorers({ waxTx, tonomyTx }) {
   }
 }
 
+async function fetchBridgeTransfer(memo) {
+  try {
+    const apiRes = await fetch(`/v1/bridge/status/${encodeURIComponent(memo)}`);
+    if (apiRes.ok) {
+      const json = await apiRes.json();
+      const row = json?.transfer || json?.data || json;
+      if (row) return { row, source: "api" };
+    }
+  } catch (e) {
+    // ignore and fall back to on-chain check
+  }
+  const r = await getRpc();
+  const res = await r.get_table_rows({
+    code: "bridge.cxc",
+    scope: "bridge.cxc",
+    table: "bridge_transfers",
+    lower_bound: memo,
+    upper_bound: memo,
+    limit: 1,
+  });
+  return { row: res.rows?.[0], source: "table" };
+}
+
 async function refreshReferralList(account) {
   const list = document.getElementById("referralList");
   const totals = document.getElementById("referralTotals");
@@ -299,7 +438,7 @@ async function refreshReferralList(account) {
       const claimed = row.claimed || row.accepted || false;
       const entry = document.createElement("div");
       entry.className = "referral-row";
-      entry.innerHTML = `<div>${invited}</div><div class="muted">${status}${claimed ? " • claimed" : ""}</div>`;
+      entry.innerHTML = `<div>${invited}</div><div class="muted">${status}${claimed ? " - claimed" : ""}</div>`;
       list.appendChild(entry);
     });
     if (totals) {
@@ -326,6 +465,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const upvoteStatus = document.getElementById("upvoteStatus");
   const upvoteMeter = document.querySelector("#upvoteMeter .fill");
   const upvoteCounts = document.getElementById("upvoteCounts");
+  const upvoteReset = document.getElementById("upvoteReset");
+  const passportBadge = document.getElementById("passportBadge");
+  const passportHint = document.getElementById("passportHint");
 
   const bridgeBtn = document.getElementById("bridgeBtn");
   const bridgeCheckBtn = document.getElementById("bridgeCheckBtn");
@@ -337,6 +479,19 @@ document.addEventListener("DOMContentLoaded", () => {
   const esrDeepLinkField = document.getElementById("esrDeepLink");
   const esrStatus = document.getElementById("esrStatus");
   const esrOpenBtn = document.getElementById("openEsr");
+
+  if (signerSelect && typeof localStorage !== "undefined") {
+    const pref = localStorage.getItem("signerPreference");
+    if (pref) signerSelect.value = pref;
+  }
+  upvoteBtnEl = upvoteBtn;
+  upvoteStatusEl = upvoteStatus;
+  upvoteMeterFillEl = upvoteMeter;
+  upvoteCountsEl = upvoteCounts;
+  upvoteResetEl = upvoteReset;
+  passportBadgeEl = passportBadge;
+  passportHintEl = passportHint;
+  renderPassportLevel(sessionDidLevel || 0);
 
   esrCallbackData = parseEsrCallbackAndClear();
   if (esrCallbackData?.account) {
@@ -391,9 +546,12 @@ document.addEventListener("DOMContentLoaded", () => {
   connectBtn?.addEventListener("click", async () => {
     try {
       selectedSignerKind = signerSelect?.value || "auto";
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem("signerPreference", selectedSignerKind);
+      }
       signer = null;
       sessionAccount = null;
-      sessionDidLevel = null;
+      sessionDidLevel = 0;
 
       await ensureSigner();
 
@@ -407,14 +565,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (sessionAccount) {
         const stats = await getUserStats(sessionAccount);
-        sessionDidLevel = stats ? stats.verification_level : null;
+        sessionDidLevel = stats?.verification_level ?? 0;
         inviteCode.value = sessionAccount;
         setHint(inviteResult, `Connected as ${sessionAccount}`, true);
-        if (stats) {
+        if (stats && statsGrid) {
           statsGrid.querySelectorAll("strong")[0].textContent = stats.direct_invites || 0;
           statsGrid.querySelectorAll("strong")[1].textContent = stats.total_downstream || 0;
           statsGrid.querySelectorAll("strong")[2].textContent = `${(stats.total_rewards?.amount || 0) / 10000} BLUX`;
         }
+        await refreshPassportAndUpvotes(sessionAccount, stats);
         await refreshReferralList(sessionAccount);
         renderOnboarding();
       } else {
@@ -466,11 +625,7 @@ document.addEventListener("DOMContentLoaded", () => {
         updateEsrOutputs(txResult, "Open in Tonomy to sign daily upvotes.");
         return;
       }
-      const alloc = await getUpvoteAllocation(user);
-      const remaining = alloc ? alloc.daily_upvotes - alloc.upvotes_used_today : 0;
-      const total = alloc ? alloc.daily_upvotes : 0;
-      upvoteMeter.style.width = total ? `${(remaining / total) * 100}%` : "0%";
-      upvoteCounts.textContent = `${remaining} / ${total} upvotes`;
+      await refreshPassportAndUpvotes(user);
       setHint(upvoteStatus, "Daily upvotes claimed", true);
     } catch (err) {
       setHint(upvoteStatus, `Error: ${err.message}`);
@@ -487,11 +642,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const memo = `TRANSFER_${Date.now()}`;
       lastBridgeMemo = memo;
       bridgeMemoInput.value = memo;
-      updateBridgeStepper("memo");
+      updateBridgeStepper("lock");
       stopBridgePolling();
       setHint(
         bridgeStatus,
-        `Lock ${amount} BLUX from ${waxAccount} to ${tonomyAccount} on bridge.cxc (WAX) memo ${memo}; then wait for oracle mint on Tonomy.`,
+        `Lock ${amount} BLUX from ${waxAccount} to ${tonomyAccount} on bridge.cxc (WAX) using memo ${memo}; then click "Check Bridge Status" to watch for the mint on Tonomy.`,
         true
       );
     } catch (err) {
@@ -506,41 +661,34 @@ document.addEventListener("DOMContentLoaded", () => {
       setHint(bridgeStatus, "Checking bridge status...");
       stopBridgePolling();
       const check = async () => {
-        const r = await getRpc();
-        const res = await r.get_table_rows({
-          code: "bridge.cxc",
-          scope: "bridge.cxc",
-          table: "bridge_transfers",
-          lower_bound: memo,
-          upper_bound: memo,
-          limit: 1,
-        });
-        const row = res.rows?.[0];
+        const { row, source } = await fetchBridgeTransfer(memo);
         if (!row) {
           setHint(bridgeStatus, `No bridge transfer found for memo ${memo}`);
           updateBridgeStepper("memo");
           return false;
         }
-        const status = (row.status || row.state || "pending").toLowerCase();
-        const qty = row.quantity || row.amount || "";
-        const waxFrom = row.wax_account || row.from || "";
-        const tonomyTo = row.tonomy_account || row.to || "";
-        const txid = row.txid || row.trx_id || row.trxid;
-        const waxTx = row.wax_trxid || row.wax_txid || null;
+        const statusRaw = (row.status || row.state || row.bridge_status || "pending").toString().toLowerCase();
+        const qty = row.quantity || row.amount || row.value || "";
+        const waxFrom = row.wax_account || row.from || row.wax_from || "";
+        const tonomyTo = row.tonomy_account || row.to || row.tonomy_to || "";
+        const txid = row.txid || row.trx_id || row.trxid || row.tonomy_txid;
+        const waxTx = row.wax_trxid || row.wax_txid || row.wax_trx;
         setBridgeExplorers({
           waxTx: waxTx ? `${EXPLORERS.waxTx}${waxTx}` : "",
-          tonomyTx: txid ? `${EXPLORERS.tonomyTx}${txid}` : "",
+          tonomyTx: txid ? `${tonomyExplorerBase()}${txid}` : "",
         });
-        let stage = "memo";
-        if (status.includes("lock")) stage = "lock";
-        if (status.includes("mint") || status.includes("done") || status.includes("complete")) stage = "done";
+        let stage = (row.stage || row.bridge_stage || "").toString().toLowerCase() || "memo";
+        if (statusRaw.includes("lock")) stage = "lock";
+        if (statusRaw.includes("mint") || statusRaw.includes("done") || statusRaw.includes("complete")) stage = "done";
         updateBridgeStepper(stage === "done" ? "done" : stage);
+        const finished =
+          statusRaw.includes("mint") || statusRaw.includes("done") || statusRaw.includes("complete") || statusRaw.includes("refund");
         setHint(
           bridgeStatus,
-          `Status: ${status} | ${qty} from ${waxFrom} to ${tonomyTo} (memo ${memo})`,
-          status.includes("mint") || status.includes("done") || status.includes("complete")
+          `Status (${source || "table"}): ${statusRaw} | ${qty} from ${waxFrom} to ${tonomyTo} (memo ${memo})`,
+          finished
         );
-        return status.includes("mint") || status.includes("done") || status.includes("complete") || status.includes("refund");
+        return finished;
       };
       const finished = await check();
       if (!finished) {
