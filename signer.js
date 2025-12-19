@@ -93,6 +93,8 @@ async function createTonomySigner(network) {
       // Try jsdelivr +esm first (closer to npm dist), then esm.sh bundle as fallback.
       const cdnCandidates = [
         "https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@1.0.0/+esm",
+        "https://unpkg.com/@tonomy/tonomy-id-sdk@1.0.0?module",
+        "https://cdn.skypack.dev/@tonomy/tonomy-id-sdk@1.0.0",
         "https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle&exports=createTonomyId"
       ];
       for (const url of cdnCandidates) {
