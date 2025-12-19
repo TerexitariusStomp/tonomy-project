@@ -2,7 +2,7 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import authRoutes from './routes/auth.routes';
+import authRoutes, { walletCallback } from './routes/auth.routes';
 
 const app = express();
 
@@ -16,6 +16,8 @@ app.use(
 );
 
 app.use('/api/auth', authRoutes);
+// Public callback endpoint for wallet ESR responses
+app.post('/callback', walletCallback);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });

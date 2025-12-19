@@ -5,6 +5,16 @@ import UserService from '../services/UserService';
 
 const router = Router();
 
+// Shared cookie options helper
+function setSessionCookie(res: Response, token: string) {
+  res.cookie('accessToken', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 24 * 60 * 60 * 1000,
+  });
+}
+
 // POST /api/auth/verify-kyc
 router.post('/verify-kyc', async (req: Request, res: Response) => {
   try {
@@ -75,6 +85,50 @@ router.post('/login-callback', async (req: Request, res: Response) => {
     });
   }
 });
+
+// POST /api/auth/callback
+// Receives wallet (ESR/tonomy://) callback payload to finalize session from QR login.
+export async function walletCallback(req: Request, res: Response) {
+  try {
+    const { request, signature, account, permission, origin, did } = req.body || {};
+    if (!request || !signature || !account) {
+      return res.status(400).json({ error: 'Missing request, signature, or account' });
+    }
+
+    // Optional: enforce callback origin if provided by wallet
+    if (origin) {
+      const trusted = await TonomyVerificationService.verifyLoginOrigin(origin);
+      if (!trusted) {
+        return res.status(400).json({ error: 'Untrusted callback origin' });
+      }
+    }
+
+    // TODO: verify signature against ESR payload with chainId + serialized transaction.
+    const user = await UserService.upsertUser({
+      username: account,
+      did: did || account,
+    });
+
+    const accessToken = TonomyVerificationService.generateAccessToken(account, did || account);
+    setSessionCookie(res, accessToken);
+
+    return res.json({
+      success: true,
+      account,
+      permission: permission || 'active',
+      did: did || account,
+      request,
+      signature,
+    });
+  } catch (error) {
+    console.error('Wallet callback failed:', error);
+    return res.status(400).json({
+      error: error instanceof Error ? error.message : 'Wallet callback failed',
+    });
+  }
+}
+
+router.post('/callback', walletCallback);
 
 // GET /api/auth/me
 router.get('/me', authenticateToken, async (req: Request, res: Response) => {

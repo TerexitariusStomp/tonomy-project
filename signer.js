@@ -12,7 +12,7 @@ const DEFAULT_NETWORK = {
 function normalizeNetwork(network) {
   return {
     chainId: network?.chainId || DEFAULT_NETWORK.chainId,
-    nodeUrl: network?.nodeUrl || DEFAULT_NETWORK.nodeUrl,
+    nodeUrl: network?.nodeUrl || network?.rpc || DEFAULT_NETWORK.nodeUrl,
   };
 }
 
@@ -28,11 +28,61 @@ export function buildTonomyLoginDeepLink(callbackUrl = typeof window !== "undefi
 
 export async function createSigner(kind = detectSignerPreference(), network) {
   const net = normalizeNetwork(network);
-  if (kind === "tonomy") return createTonomySigner();
+  if (kind === "tonomy") return createTonomySigner(net);
   return createAnchorSigner(net);
 }
 
-async function createTonomySigner() {
+// Lightweight ESR (WharfKit Signing Request) helper for QR/deep-link login.
+let esrToolkit = null;
+
+async function loadEsrToolkit(network) {
+  const net = normalizeNetwork(network);
+  if (esrToolkit && esrToolkit.chainId === net.chainId && esrToolkit.nodeUrl === net.nodeUrl) {
+    return esrToolkit;
+  }
+  const [srMod, antelopeMod, abiCacheMod, pakoMod] = await Promise.all([
+    import("https://cdn.jsdelivr.net/npm/@wharfkit/signing-request/+esm"),
+    import("https://cdn.jsdelivr.net/npm/@wharfkit/antelope/+esm"),
+    import("https://cdn.jsdelivr.net/npm/@wharfkit/abicache/+esm"),
+    import("https://cdn.jsdelivr.net/npm/pako@2/+esm"),
+  ]);
+  const SigningRequest = srMod.SigningRequest || srMod.default || srMod;
+  const APIClient = antelopeMod.APIClient || antelopeMod.default?.APIClient || antelopeMod.default || antelopeMod;
+  const ABICache = abiCacheMod.ABICache || abiCacheMod.default || abiCacheMod;
+  const pako = pakoMod.default || pakoMod;
+  const client = new APIClient({ url: net.nodeUrl });
+  const abiCache = new ABICache(client);
+  esrToolkit = { SigningRequest, pako, abiCache, client, chainId: net.chainId, nodeUrl: net.nodeUrl };
+  return esrToolkit;
+}
+
+export async function buildTonomyLoginQrLink(network, { callbackUrl } = {}) {
+  const net = normalizeNetwork(network);
+  try {
+    const { SigningRequest, pako, abiCache, chainId } = await loadEsrToolkit(net);
+    const request = await SigningRequest.identity(
+      {
+        callback: callbackUrl
+          ? {
+              url: callbackUrl,
+              background: true,
+            }
+          : undefined,
+        chainId,
+      },
+      { zlib: pako, abiProvider: abiCache }
+    );
+    const esr = request.encode(true, true, "esr");
+    const deepLink = `tonomy://sign?request=${encodeURIComponent(esr)}`;
+    return { esr, deepLink, chainId };
+  } catch (err) {
+    // Fallback to legacy deep link if ESR cannot be built (e.g., CDN blocked)
+    const deepLink = buildTonomyLoginDeepLink(callbackUrl);
+    return { esr: null, deepLink, chainId: net.chainId, error: err };
+  }
+}
+
+async function createTonomySigner(network) {
   let tonomy = window.tonomy;
   if (!tonomy) {
     // Use injected createTonomyId if present (loaded via CDN), otherwise dynamic import via CDN.
@@ -48,6 +98,7 @@ async function createTonomySigner() {
     tonomy = await createTonomyIdGlobal({
       appId: TONOMY_APP_ID,
       callbackUrl: window.location.href,
+      chainId: network?.chainId,
     });
   }
 

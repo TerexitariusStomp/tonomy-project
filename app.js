@@ -1,6 +1,6 @@
 console.log('app.js loaded');
 
-import { buildTonomyLoginDeepLink, createSigner } from "./signer.js";
+import { buildTonomyLoginDeepLink, buildTonomyLoginQrLink, createSigner } from "./signer.js";
 import { ExternalUser, setSettings } from "https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@0.6.2/dist/tonomy-id-sdk.esm.js";
 import { JsonRpc } from "https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jsonrpc.esm.js";
 import { JsSignatureProvider } from "https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jssig.esm.js";
@@ -10,8 +10,8 @@ import { Api } from "https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-api.es
 const NETWORKS = {
   pangea: {
     label: "Pangea (Tonomy)",
-    rpc: "https://pangea.rpc.url", // TODO: replace with live Pangea RPC
-    chainId: "PANGEA_CHAIN_ID_HERE",
+    rpc: "https://rpc.pangea.tonomy.io", // TODO: confirm/replace with official Pangea RPC endpoint
+    chainId: null, // will be fetched via get_info when needed
     explorerTx: "https://explorer.pangea.url/transaction/"
   },
   eos: {
@@ -74,6 +74,7 @@ let upvoteResetEl = null;
 let passportBadgeEl = null;
 let passportHintEl = null;
 let qrInstance = null;
+let lastBuiltQrLink = null;
 
 function currentNetwork() {
   const preset = NETWORKS[selectedNetwork] || NETWORKS.pangea;
@@ -98,6 +99,23 @@ async function getRpc() {
     rpc = new JsonRpc(currentNetwork().rpc);
   }
   return rpc;
+}
+
+async function fetchChainIdIfMissing(net) {
+  const target = net || currentNetwork();
+  if (target.chainId) return target.chainId;
+  try {
+    const infoRes = await fetch(`${target.rpc}/v1/chain/get_info`, { method: "POST" });
+    if (!infoRes.ok) throw new Error(`RPC responded ${infoRes.status}`);
+    const info = await infoRes.json();
+    if (info?.chain_id) {
+      NETWORKS[selectedNetwork].chainId = info.chain_id;
+      return info.chain_id;
+    }
+  } catch (err) {
+    console.warn("Could not fetch chain id:", err.message);
+  }
+  return null;
 }
 
 function setHint(el, text, success = false) {
@@ -255,7 +273,12 @@ async function refreshPassportAndUpvotes(account, stats) {
 async function ensureSigner() {
   console.log('Ensuring signer...');
   if (!signer) {
-    signer = await createSigner("tonomy", currentNetwork());
+    const net = currentNetwork();
+    // Ensure chainId is known before creating signer when possible
+    if (!net.chainId) {
+      await fetchChainIdIfMissing(net);
+    }
+    signer = await createSigner("tonomy", { ...net, chainId: net.chainId || NETWORKS.pangea.chainId });
   }
   if (!sessionAccount) {
     console.log('No sessionAccount, attempting login...');
@@ -457,6 +480,42 @@ function renderTonomyQr(targetEl, link, statusEl) {
   if (statusEl) setHint(statusEl, "Scan with the Tonomy wallet to connect.", true);
 }
 
+function defaultCallbackUrl() {
+  if (typeof window === "undefined" || !window.location) return "";
+  return `${window.location.origin}/callback`;
+}
+
+async function buildAndRenderLoginQr(qrBox, qrLinkInput, statusEl) {
+  if (!qrBox) return null;
+  try {
+    if (statusEl) setHint(statusEl, "Building ESR login request...");
+    const net = currentNetwork();
+    if (!net.chainId) {
+      await fetchChainIdIfMissing(net);
+    }
+    const { deepLink, error } = await buildTonomyLoginQrLink(
+      { ...net, chainId: net.chainId || NETWORKS.pangea.chainId },
+      {
+      callbackUrl: defaultCallbackUrl(),
+    }
+    );
+    lastBuiltQrLink = deepLink;
+    if (qrLinkInput) qrLinkInput.value = deepLink;
+    renderTonomyQr(qrBox, deepLink, statusEl);
+    if (error && statusEl) {
+      setHint(statusEl, `Using fallback deep link; ESR error: ${error.message}`);
+    }
+    return deepLink;
+  } catch (err) {
+    const fallback = buildTonomyLoginDeepLink(defaultCallbackUrl());
+    lastBuiltQrLink = fallback;
+    if (qrLinkInput) qrLinkInput.value = fallback;
+    renderTonomyQr(qrBox, fallback, statusEl);
+    if (statusEl) setHint(statusEl, `QR build failed: ${err.message}`);
+    return fallback;
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const connectBtn = document.getElementById("connectBtn");
   const networkSelect = document.getElementById("networkSelect");
@@ -560,18 +619,18 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       setHint(inviteResult, `Connect error: ${err.message}`);
       if (qrBox) {
-        const link = buildTonomyLoginDeepLink();
-        if (qrLink) qrLink.value = link;
-        renderTonomyQr(qrBox, link, qrStatus);
+        await buildAndRenderLoginQr(qrBox, qrLink, qrStatus);
       }
     }
   });
 
-  qrBtn?.addEventListener("click", () => {
-    const link = buildTonomyLoginDeepLink();
-    if (qrLink) qrLink.value = link;
-    renderTonomyQr(qrBox, link, qrStatus);
+  qrBtn?.addEventListener("click", async () => {
+    await buildAndRenderLoginQr(qrBox, qrLink, qrStatus);
   });
+
+  if (qrBox) {
+    buildAndRenderLoginQr(qrBox, qrLink, qrStatus);
+  }
 
   inviteBtn.addEventListener("click", async () => {
     try {
