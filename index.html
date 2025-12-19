@@ -146,12 +146,16 @@
       pkg = await import("https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@1.0.0/+esm");
     } catch (e) {
       try {
-        pkg = await import("https://unpkg.com/@tonomy/tonomy-id-sdk@1.0.0?module");
-      } catch (e2) {
+        pkg = await import("https://unpkg.com/@tonomy/tonomy-id-sdk@1.0.0/dist/tonomy-id-sdk.esm.js");
+      } catch (e1) {
         try {
-          pkg = await import("https://cdn.skypack.dev/@tonomy/tonomy-id-sdk@1.0.0");
-        } catch (e3) {
-          pkg = await import("https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle&exports=createTonomyId");
+        pkg = await import("https://unpkg.com/@tonomy/tonomy-id-sdk@1.0.0?module");
+        } catch (e2) {
+          try {
+            pkg = await import("https://cdn.skypack.dev/@tonomy/tonomy-id-sdk@1.0.0");
+          } catch (e3) {
+            pkg = await import("https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle&exports=createTonomyId");
+          }
         }
       }
     }
