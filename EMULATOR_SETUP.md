@@ -14,7 +14,12 @@ The current codebase in `app.js` and `signer.js` uses the Tonomy ID SDK v1.0.0 (
 The SDK is loaded via CDN in `index.html`:
 ```html
 <script type="module">
-  import pkg from "https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle&exports=createTonomyId";
+  let pkg;
+  try {
+    pkg = await import("https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@1.0.0/+esm");
+  } catch (e) {
+    pkg = await import("https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle&exports=createTonomyId");
+  }
   window.createTonomyId = pkg.createTonomyId || pkg.default?.createTonomyId || pkg.default || pkg;
 </script>
 ```

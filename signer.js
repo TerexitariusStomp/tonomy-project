@@ -89,12 +89,29 @@ async function createTonomySigner(network) {
     // Use injected createTonomyId if present (loaded via CDN), otherwise dynamic import via CDN.
     let createTonomyIdGlobal = window.createTonomyId;
     if (!createTonomyIdGlobal) {
-      try {
-        // esm.sh bundles dependencies for browser module loading; ensure we grab named or default export
-        const mod = await import("https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle&exports=createTonomyId");
-        createTonomyIdGlobal = mod.createTonomyId || mod.default?.createTonomyId || mod.default;
-      } catch (e) {
-        throw new Error("Tonomy ID SDK not injected. Bundle @tonomy/tonomy-id-sdk or open via Tonomy app.");
+      let lastErr = null;
+      // Try jsdelivr +esm first (closer to npm dist), then esm.sh bundle as fallback.
+      const cdnCandidates = [
+        "https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@1.0.0/+esm",
+        "https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle&exports=createTonomyId"
+      ];
+      for (const url of cdnCandidates) {
+        try {
+          const mod = await import(url);
+          createTonomyIdGlobal =
+            mod.createTonomyId ||
+            mod.default?.createTonomyId ||
+            mod.default ||
+            mod;
+          if (createTonomyIdGlobal) {
+            break;
+          }
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      if (!createTonomyIdGlobal) {
+        throw new Error(`Tonomy ID SDK not injected. Last error: ${lastErr?.message || "unknown"}`);
       }
     }
     tonomy = await createTonomyIdGlobal({
