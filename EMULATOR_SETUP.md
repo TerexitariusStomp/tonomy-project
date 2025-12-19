@@ -14,8 +14,8 @@ The current codebase in `app.js` and `signer.js` uses the Tonomy ID SDK v1.0.0 (
 The SDK is loaded via CDN in `index.html`:
 ```html
 <script type="module">
-  import { createTonomyId } from "https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle";
-  window.createTonomyId = createTonomyId;
+  import pkg from "https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle&exports=createTonomyId";
+  window.createTonomyId = pkg.createTonomyId || pkg.default?.createTonomyId || pkg.default || pkg;
 </script>
 ```
 No changes needed here. For local bundling (optional, for offline dev):

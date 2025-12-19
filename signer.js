@@ -23,7 +23,8 @@ export function detectSignerPreference() {
 
 export function buildTonomyLoginDeepLink(callbackUrl = typeof window !== "undefined" ? window.location.href : "") {
   const params = new URLSearchParams({ appId: TONOMY_APP_ID, callback: callbackUrl });
-  return `tonomy://login?${params.toString()}`;
+  // Tonomy mobile expects the tonomyid:// schema
+  return `tonomyid://login?${params.toString()}`;
 }
 
 export async function createSigner(kind = detectSignerPreference(), network) {
@@ -73,7 +74,7 @@ export async function buildTonomyLoginQrLink(network, { callbackUrl } = {}) {
       { zlib: pako, abiProvider: abiCache }
     );
     const esr = request.encode(true, true, "esr");
-    const deepLink = `tonomy://sign?request=${encodeURIComponent(esr)}`;
+    const deepLink = `tonomyid://sign?request=${encodeURIComponent(esr)}`;
     return { esr, deepLink, chainId };
   } catch (err) {
     // Fallback to legacy deep link if ESR cannot be built (e.g., CDN blocked)
@@ -89,9 +90,9 @@ async function createTonomySigner(network) {
     let createTonomyIdGlobal = window.createTonomyId;
     if (!createTonomyIdGlobal) {
       try {
-        // esm.sh bundles dependencies for browser module loading
-        const mod = await import("https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle");
-        createTonomyIdGlobal = mod.createTonomyId || mod.default;
+        // esm.sh bundles dependencies for browser module loading; ensure we grab named or default export
+        const mod = await import("https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle&exports=createTonomyId");
+        createTonomyIdGlobal = mod.createTonomyId || mod.default?.createTonomyId || mod.default;
       } catch (e) {
         throw new Error("Tonomy ID SDK not injected. Bundle @tonomy/tonomy-id-sdk or open via Tonomy app.");
       }
