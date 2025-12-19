@@ -89,7 +89,8 @@ async function createTonomySigner(network) {
     let createTonomyIdGlobal = window.createTonomyId;
     if (!createTonomyIdGlobal) {
       try {
-        const mod = await import("https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@1.0.0/dist/tonomy-id-sdk.esm.js");
+        // esm.sh bundles dependencies for browser module loading
+        const mod = await import("https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle");
         createTonomyIdGlobal = mod.createTonomyId || mod.default;
       } catch (e) {
         throw new Error("Tonomy ID SDK not injected. Bundle @tonomy/tonomy-id-sdk or open via Tonomy app.");

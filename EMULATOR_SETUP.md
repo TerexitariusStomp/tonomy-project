@@ -3,7 +3,7 @@
 ## Overview
 This guide sets up the Tonomy ID emulator to test deep link authentication flows in the cXc Pangea integration. The emulator simulates the Tonomy mobile app on desktop, allowing you to test login and transaction deep links without a physical device. This ensures the session populates correctly after authentication and that contract actions (e.g., `sendinvite`, `claimdaily`) execute as expected via the signer.
 
-The current codebase in `app.js` and `signer.js` uses the Tonomy ID SDK v1.0.0, which supports emulator mode through configuration. The SDK detects `window.tonomy` for deep links or initializes via `createTonomyId`. App.js now includes automatic session initialization on page load via `initSession()`, which calls `ensureSigner()` and `login()` to populate `sessionAccount` and update UI elements (invite code, stats, passport level, referrals). Session persistence uses localStorage for `sessionAccount` alongside SDK internals.
+The current codebase in `app.js` and `signer.js` uses the Tonomy ID SDK v1.0.0 (loaded via esm.sh bundling), which supports emulator mode through configuration. The SDK detects `window.tonomy` for deep links or initializes via `createTonomyId`. App.js now includes automatic session initialization on page load via `initSession()`, which calls `ensureSigner()` and `login()` to populate `sessionAccount` and update UI elements (invite code, stats, passport level, referrals). Session persistence uses localStorage for `sessionAccount` alongside SDK internals.
 
 ## Prerequisites
 - Node.js (for serving the app)
@@ -14,7 +14,7 @@ The current codebase in `app.js` and `signer.js` uses the Tonomy ID SDK v1.0.0, 
 The SDK is loaded via CDN in `index.html`:
 ```html
 <script type="module">
-  import { createTonomyId } from "https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@1.0.0/dist/tonomy-id-sdk.esm.js";
+  import { createTonomyId } from "https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle";
   window.createTonomyId = createTonomyId;
 </script>
 ```
