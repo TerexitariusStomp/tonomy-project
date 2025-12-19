@@ -1,9 +1,6 @@
 console.log('app.js loaded');
 
 import { buildTonomyLoginDeepLink, buildTonomyLoginQrLink, createSigner } from "./signer.js";
-import { JsonRpc } from "https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jsonrpc.esm.js";
-import { JsSignatureProvider } from "https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jssig.esm.js";
-import { Api } from "https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-api.esm.js";
 
 // Network presets; update pangea values once live RPC + chainId are confirmed.
 const NETWORKS = {
@@ -464,19 +461,23 @@ function renderTonomyQr(targetEl, link, statusEl) {
     if (statusEl) setHint(statusEl, "QR code library not loaded.");
     return;
   }
-  if (!qrInstance) {
-    qrInstance = new qrLib(targetEl, {
-      text: link,
-      width: 220,
-      height: 220,
-      colorDark: "#ffffff",
-      colorLight: "#121212",
-      correctLevel: qrLib.CorrectLevel.M,
-    });
-  } else {
-    qrInstance.makeCode(link);
+  try {
+    if (!qrInstance) {
+      qrInstance = new qrLib(targetEl, {
+        text: link,
+        width: 220,
+        height: 220,
+        colorDark: "#ffffff",
+        colorLight: "#121212",
+        correctLevel: qrLib.CorrectLevel.M,
+      });
+    } else {
+      qrInstance.makeCode(link);
+    }
+    if (statusEl) setHint(statusEl, "Scan with the Tonomy wallet to connect.", true);
+  } catch (qrErr) {
+    if (statusEl) setHint(statusEl, `Could not render QR: ${qrErr.message}`);
   }
-  if (statusEl) setHint(statusEl, "Scan with the Tonomy wallet to connect.", true);
 }
 
 function defaultCallbackUrl() {
@@ -486,6 +487,11 @@ function defaultCallbackUrl() {
 
 async function buildAndRenderLoginQr(qrBox, qrLinkInput, statusEl) {
   if (!qrBox) return null;
+  const fallback = buildTonomyLoginDeepLink(defaultCallbackUrl());
+  // Always show something immediately so the user can scan even if ESR fails.
+  renderTonomyQr(qrBox, fallback, statusEl);
+  lastBuiltQrLink = fallback;
+  if (qrLinkInput) qrLinkInput.value = fallback;
   try {
     if (statusEl) setHint(statusEl, "Building ESR login request...");
     const net = currentNetwork();
@@ -600,8 +606,11 @@ document.addEventListener("DOMContentLoaded", () => {
         qrCard.style.display = 'block';
       }
 
+      if (qrStatus) setHint(qrStatus, "Preparing QR...");
       if (qrBox && qrStatus) {
         await buildAndRenderLoginQr(qrBox, null, qrStatus);
+      } else if (qrStatus) {
+        setHint(qrStatus, "QR target missing in DOM.");
       }
 
       await ensureSigner();
@@ -629,7 +638,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error('Connect error:', err);
       setHint(inviteResult, `Connect error: ${err.message}`);
       if (qrStatus) {
-        setHint(qrStatus, "Scan the QR code to connect.", true);
+        setHint(qrStatus, `QR/connect error: ${err.message}`);
       }
     }
   });
