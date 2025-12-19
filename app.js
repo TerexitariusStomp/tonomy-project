@@ -1,7 +1,6 @@
 console.log('app.js loaded');
 
 import { buildTonomyLoginDeepLink, buildTonomyLoginQrLink, createSigner } from "./signer.js";
-import { ExternalUser, setSettings } from "https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@0.6.2/dist/tonomy-id-sdk.esm.js";
 import { JsonRpc } from "https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jsonrpc.esm.js";
 import { JsSignatureProvider } from "https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jssig.esm.js";
 import { Api } from "https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-api.esm.js";
@@ -589,14 +588,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   connectBtn?.addEventListener("click", async () => {
+    const qrCard = document.getElementById("qrCard");
+    const qrBox = document.getElementById("tonomyQr");
+    const qrStatus = document.getElementById("tonomyQrStatus");
     try {
       signer = null;
       sessionAccount = null;
       sessionDidLevel = 0;
-
-      const qrCard = document.getElementById("qrCard");
-      const qrBox = document.getElementById("tonomyQr");
-      const qrStatus = document.getElementById("tonomyQrStatus");
 
       if (qrCard) {
         qrCard.style.display = 'block';
