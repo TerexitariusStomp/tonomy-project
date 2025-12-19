@@ -541,7 +541,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const bridgeStatus = document.getElementById("bridgeStatus");
   const onboardingNextBtn = document.getElementById("onboardingNext");
   const onboardingResetBtn = document.getElementById("onboardingReset");
-  const qrBtn = document.getElementById("generateQr");
   const qrBox = document.getElementById("tonomyQr");
   const qrLink = document.getElementById("tonomyQrLink");
   const qrStatus = document.getElementById("tonomyQrStatus");
@@ -598,6 +597,10 @@ document.addEventListener("DOMContentLoaded", () => {
       sessionAccount = null;
       sessionDidLevel = 0;
 
+      if (qrBox) {
+        await buildAndRenderLoginQr(qrBox, qrLink, qrStatus);
+      }
+
       await ensureSigner();
 
       if (sessionAccount) {
@@ -614,23 +617,16 @@ document.addEventListener("DOMContentLoaded", () => {
         await refreshReferralList(sessionAccount);
         renderOnboarding();
       } else {
-        setHint(inviteResult, "Could not determine account from signer.");
+        setHint(inviteResult, "Scan the QR code with Tonomy wallet to connect.");
       }
     } catch (err) {
       setHint(inviteResult, `Connect error: ${err.message}`);
-      if (qrBox) {
-        await buildAndRenderLoginQr(qrBox, qrLink, qrStatus);
+      if (qrStatus) {
+        setHint(qrStatus, "Scan the QR code to connect.", true);
       }
     }
   });
 
-  qrBtn?.addEventListener("click", async () => {
-    await buildAndRenderLoginQr(qrBox, qrLink, qrStatus);
-  });
-
-  if (qrBox) {
-    buildAndRenderLoginQr(qrBox, qrLink, qrStatus);
-  }
 
   inviteBtn.addEventListener("click", async () => {
     try {
