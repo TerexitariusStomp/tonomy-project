@@ -541,9 +541,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const bridgeStatus = document.getElementById("bridgeStatus");
   const onboardingNextBtn = document.getElementById("onboardingNext");
   const onboardingResetBtn = document.getElementById("onboardingReset");
-  const qrBox = document.getElementById("tonomyQr");
-  const qrLink = document.getElementById("tonomyQrLink");
-  const qrStatus = document.getElementById("tonomyQrStatus");
   upvoteBtnEl = upvoteBtn;
   upvoteStatusEl = upvoteStatus;
   upvoteMeterFillEl = upvoteMeter;
@@ -597,8 +594,36 @@ document.addEventListener("DOMContentLoaded", () => {
       sessionAccount = null;
       sessionDidLevel = 0;
 
-      if (qrBox) {
-        await buildAndRenderLoginQr(qrBox, qrLink, qrStatus);
+      // Dynamically create QR container
+      let qrContainer = document.getElementById('dynamicQrContainer');
+      if (!qrContainer) {
+        qrContainer = document.createElement('section');
+        qrContainer.className = 'card';
+        qrContainer.id = 'dynamicQrContainer';
+        qrContainer.innerHTML = `
+          <h2>Connect via QR</h2>
+          <p>Scan with the Tonomy mobile wallet to connect this session.</p>
+          <div class="grid">
+            <div class="qr-panel">
+              <div id="tonomyQr" class="qr-box"></div>
+            </div>
+          </div>
+          <div id="tonomyQrStatus" class="hint"></div>
+        `;
+        const main = document.querySelector('main');
+        if (main) {
+          main.insertBefore(qrContainer, main.firstChild);
+        } else {
+          document.body.appendChild(qrContainer);
+        }
+      }
+      qrContainer.style.display = 'block'; // Show if hidden
+
+      const qrBox = document.getElementById("tonomyQr");
+      const qrStatus = document.getElementById("tonomyQrStatus");
+
+      if (qrBox && qrStatus) {
+        await buildAndRenderLoginQr(qrBox, null, qrStatus);
       }
 
       await ensureSigner();
@@ -616,11 +641,16 @@ document.addEventListener("DOMContentLoaded", () => {
         await refreshPassportAndUpvotes(sessionAccount, stats);
         await refreshReferralList(sessionAccount);
         renderOnboarding();
+        // Hide QR container after successful connection
+        if (qrContainer) {
+          qrContainer.style.display = 'none';
+        }
       } else {
         setHint(inviteResult, "Scan the QR code with Tonomy wallet to connect.");
       }
     } catch (err) {
       setHint(inviteResult, `Connect error: ${err.message}`);
+      const qrStatus = document.getElementById("tonomyQrStatus");
       if (qrStatus) {
         setHint(qrStatus, "Scan the QR code to connect.", true);
       }
