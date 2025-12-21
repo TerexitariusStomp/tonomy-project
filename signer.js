@@ -89,13 +89,40 @@ async function loadEsrToolkit(network) {
   if (esrToolkit && esrToolkit.chainId === net.chainId && esrToolkit.nodeUrl === net.nodeUrl) {
     return esrToolkit;
   }
-  // Use bundled ESM builds to avoid missing re-exports (e.g., hash.js sha256)
-  const [srMod, antelopeMod, abiCacheMod, pakoMod] = await Promise.all([
-    import("https://cdn.jsdelivr.net/npm/@wharfkit/signing-request@3.3.0/+esm"),
-    import("https://cdn.jsdelivr.net/npm/@wharfkit/antelope@1.0.1/+esm"),
-    import("https://cdn.jsdelivr.net/npm/@wharfkit/abicache@1.0.1/+esm"),
-    import("https://cdn.jsdelivr.net/npm/pako@2.1.0/+esm"),
-  ]);
+  const loaders = [
+    {
+      sr: "https://unpkg.com/@wharfkit/signing-request@3.3.0/dist/signing-request.esm.js",
+      antelope: "https://unpkg.com/@wharfkit/antelope@1.0.1/dist/antelope.esm.js",
+      abicache: "https://unpkg.com/@wharfkit/abicache@1.0.1/dist/abicache.esm.js",
+      pako: "https://unpkg.com/pako@2.1.0/dist/pako.esm.mjs",
+    },
+    {
+      sr: "https://cdn.jsdelivr.net/npm/@wharfkit/signing-request@3.3.0/+esm",
+      antelope: "https://cdn.jsdelivr.net/npm/@wharfkit/antelope@1.0.1/+esm",
+      abicache: "https://cdn.jsdelivr.net/npm/@wharfkit/abicache@1.0.1/+esm",
+      pako: "https://cdn.jsdelivr.net/npm/pako@2.1.0/+esm",
+    },
+  ];
+
+  let srMod, antelopeMod, abiCacheMod, pakoMod;
+  let lastErr = null;
+  for (const urls of loaders) {
+    try {
+      [srMod, antelopeMod, abiCacheMod, pakoMod] = await Promise.all([
+        import(urls.sr),
+        import(urls.antelope),
+        import(urls.abicache),
+        import(urls.pako),
+      ]);
+      lastErr = null;
+      break;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  if (lastErr) {
+    throw lastErr;
+  }
   const SigningRequest = srMod.SigningRequest || srMod.default || srMod;
   const APIClient = antelopeMod.APIClient || antelopeMod.default?.APIClient || antelopeMod.default || antelopeMod;
   const ABICache = abiCacheMod.ABICache || abiCacheMod.default || abiCacheMod;
