@@ -1,6 +1,15 @@
 console.log('app.js loaded');
 
+import { setSettings } from "./vendor/tonomy-id-sdk.esm.js";
 import { buildTonomyLoginDeepLink, buildTonomyLoginQrLink, createSigner } from "./signer.js";
+
+// Configure Tonomy SDK endpoints before any signer/login calls.
+setSettings({
+  ssoWebsiteOrigin: "https://accounts.testnet.tonomy.io",
+  blockchainUrl: "https://test.pangea.eosusa.io",
+  communicationUrl: "wss://communication.testnet.tonomy.io",
+  currencySymbol: "TONO",
+});
 
 // Network presets; update pangea values once live RPC + chainId are confirmed.
 const NETWORKS = {
@@ -277,7 +286,8 @@ async function ensureSigner() {
     if (!net.chainId) {
       await fetchChainIdIfMissing(net);
     }
-    signer = await createSigner("tonomy", { ...net, chainId: net.chainId || NETWORKS.pangea.chainId });
+    const signerKind = selectedNetwork === "local" ? "local" : "tonomy";
+    signer = await createSigner(signerKind, net);
   }
   if (!sessionAccount) {
     console.log('No sessionAccount, attempting login...');

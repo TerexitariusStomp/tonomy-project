@@ -1,7 +1,9 @@
 // Signer adapter supporting Tonomy ID (mobile-first) with optional Anchor fallback.
 // For pure browser usage without bundling, inject window.tonomy or window.createTonomyId.
-
 const TONOMY_APP_ID = "cxc.world";
+
+const LOCAL_PRIVATE_KEY = "PVT_K1_2uHPhMTnaS5bAAZfFko6nTSydt5kNYjK9jj8zySgrC2sxH5JjS";
+
 
 // Default network targets EOS mainnet; callers can pass a different RPC/chainId (e.g., Pangea).
 const DEFAULT_NETWORK = {
