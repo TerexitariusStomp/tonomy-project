@@ -23,8 +23,8 @@ export function detectSignerPreference() {
 
 export function buildTonomyLoginDeepLink(callbackUrl = typeof window !== "undefined" ? window.location.href : "") {
   const params = new URLSearchParams({ appId: TONOMY_APP_ID, callback: callbackUrl });
-  // Tonomy mobile expects the tonomyid:// schema
-  return `tonomyid://login?${params.toString()}`;
+  // Use legacy tonomy:// schema for broader wallet compatibility
+  return `tonomy://login?${params.toString()}`;
 }
 
 // Wait for the SDK to be injected by the preloader in index.html
@@ -34,7 +34,7 @@ async function waitForTonomySdk(timeoutMs = 40000) {
   if (window.createTonomyId) return window.createTonomyId;
   // Try direct local import as a safety net in case the preloader failed
   try {
-    const modLocal = await import("./vendor/tonomy-id-sdk.esm.js");
+    const modLocal = await import("/vendor/tonomy-id-sdk.esm.js");
     const createLocal =
       modLocal.createTonomyId ||
       modLocal.default?.createTonomyId ||
@@ -150,7 +150,7 @@ export async function buildTonomyLoginQrLink(network, { callbackUrl } = {}) {
       { zlib: pako, abiProvider: abiCache }
     );
     const esr = request.encode(true, true, "esr");
-    const deepLink = `tonomyid://sign?request=${encodeURIComponent(esr)}`;
+    const deepLink = `tonomy://sign?request=${encodeURIComponent(esr)}`;
     return { esr, deepLink, chainId };
   } catch (err) {
     // Fallback to legacy deep link if ESR cannot be built (e.g., CDN blocked)

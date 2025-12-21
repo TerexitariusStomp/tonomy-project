@@ -12,7 +12,7 @@
   <!-- Tonomy ID SDK local load (no CDN) -->
   <script type="module">
     try {
-      const mod = await import("./vendor/tonomy-id-sdk.esm.js");
+      const mod = await import("/vendor/tonomy-id-sdk.esm.js");
       const create =
         mod.createTonomyId ||
         mod.default?.createTonomyId ||
