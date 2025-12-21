@@ -34,6 +34,9 @@ const EXPLORERS = {
   tonomyTx: "https://explorer.pangea.url/transaction/" // TODO: replace with live explorer base
 };
 
+// Toggle ESR QR generation. Disabled to avoid flaky CDN ESM fetches; falls back to deep link.
+const USE_ESR_QR = false;
+
 const PASSPORT_ALLOWANCES = {
   0: 0,
   1: 10,
@@ -492,6 +495,10 @@ async function buildAndRenderLoginQr(qrBox, qrLinkInput, statusEl) {
   renderTonomyQr(qrBox, fallback, statusEl);
   lastBuiltQrLink = fallback;
   if (qrLinkInput) qrLinkInput.value = fallback;
+  if (!USE_ESR_QR) {
+    if (statusEl) setHint(statusEl, "Using fallback deep link (ESR disabled).", true);
+    return fallback;
+  }
   try {
     if (statusEl) setHint(statusEl, "Building ESR login request...");
     const net = currentNetwork();
