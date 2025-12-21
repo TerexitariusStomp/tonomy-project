@@ -11,43 +11,25 @@ The current codebase in `app.js` and `signer.js` uses the Tonomy ID SDK v1.0.0 (
 - The project is served at `http://localhost:3000` (current setup via `npx http-server . -p 3000 -c-1`)
 
 ## Step 1: Install Tonomy ID SDK (Already Bundled)
-The SDK is loaded via CDN in `index.html` using a preloader with multi-CDN fallback:
+The SDK is loaded locally in `index.html` (vendored `./vendor/tonomy-id-sdk.esm.js`); no CDN needed:
 ```html
-<script>
-  (function loadTonomySdk() {
-    const cdns = [
-      "https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@1.0.0/+esm",
-      "https://unpkg.com/@tonomy/tonomy-id-sdk@1.0.0/dist/tonomy-id-sdk.esm.js",
-      "https://unpkg.com/@tonomy/tonomy-id-sdk@1.0.0?module",
-      "https://cdn.skypack.dev/@tonomy/tonomy-id-sdk@1.0.0",
-      "https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle&exports=createTonomyId"
-    ];
-    let lastErr = null;
-    const readyEvent = () => window.dispatchEvent(new Event("tonomy-sdk-ready"));
-    const failEvent = (detail) => window.dispatchEvent(new CustomEvent("tonomy-sdk-failed", { detail }));
-
-    (async () => {
-      for (const url of cdns) {
-        try {
-          const mod = await import(url);
-          const create =
-            mod.createTonomyId ||
-            mod.default?.createTonomyId ||
-            mod.default ||
-            mod;
-          if (typeof create === "function") {
-            window.createTonomyId = create;
-            window.TonomySDKUrl = url;
-            readyEvent();
-            return;
-          }
-        } catch (err) {
-          lastErr = err;
-        }
-      }
-      failEvent(lastErr?.message || "Could not load Tonomy ID SDK from any CDN");
-    })();
-  })();
+<script type="module">
+  try {
+    const mod = await import("./vendor/tonomy-id-sdk.esm.js");
+    const create =
+      mod.createTonomyId ||
+      mod.default?.createTonomyId ||
+      mod.default ||
+      mod;
+    if (typeof create !== "function") throw new Error("createTonomyId export missing");
+    window.createTonomyId = create;
+    window.TonomySDKUrl = "./vendor/tonomy-id-sdk.esm.js";
+    window.dispatchEvent(new Event("tonomy-sdk-ready"));
+  } catch (err) {
+    window.dispatchEvent(
+      new CustomEvent("tonomy-sdk-failed", { detail: err?.message || String(err) })
+    );
+  }
 </script>
 ```
 No changes needed here. For local bundling (optional, for offline dev):
