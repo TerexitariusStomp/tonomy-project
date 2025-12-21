@@ -91,10 +91,10 @@ async function loadEsrToolkit(network) {
   }
   // Use bundled ESM builds to avoid missing re-exports (e.g., hash.js sha256)
   const [srMod, antelopeMod, abiCacheMod, pakoMod] = await Promise.all([
-    import("https://esm.sh/@wharfkit/signing-request@3.3.0?bundle"),
-    import("https://esm.sh/@wharfkit/antelope@1.0.1?bundle"),
-    import("https://esm.sh/@wharfkit/abicache@1.0.1?bundle"),
-    import("https://esm.sh/pako@2.1.0?bundle"),
+    import("https://cdn.jsdelivr.net/npm/@wharfkit/signing-request@3.3.0/+esm"),
+    import("https://cdn.jsdelivr.net/npm/@wharfkit/antelope@1.0.1/+esm"),
+    import("https://cdn.jsdelivr.net/npm/@wharfkit/abicache@1.0.1/+esm"),
+    import("https://cdn.jsdelivr.net/npm/pako@2.1.0/+esm"),
   ]);
   const SigningRequest = srMod.SigningRequest || srMod.default || srMod;
   const APIClient = antelopeMod.APIClient || antelopeMod.default?.APIClient || antelopeMod.default || antelopeMod;
