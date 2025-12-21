@@ -29,9 +29,25 @@ export function buildTonomyLoginDeepLink(callbackUrl = typeof window !== "undefi
 
 // Wait for the SDK to be injected by the preloader in index.html
 let tonomyWaitPromise = null;
-async function waitForTonomySdk(timeoutMs = 15000) {
+async function waitForTonomySdk(timeoutMs = 40000) {
   if (typeof window === "undefined") throw new Error("No window context for Tonomy SDK");
   if (window.createTonomyId) return window.createTonomyId;
+  // Try direct local import as a safety net in case the preloader failed
+  try {
+    const modLocal = await import("./vendor/tonomy-id-sdk.esm.js");
+    const createLocal =
+      modLocal.createTonomyId ||
+      modLocal.default?.createTonomyId ||
+      modLocal.default ||
+      modLocal;
+    if (typeof createLocal === "function") {
+      window.createTonomyId = createLocal;
+      window.TonomySDKUrl = "./vendor/tonomy-id-sdk.esm.js";
+      return createLocal;
+    }
+  } catch (_e) {
+    // ignore and fall back to event-based wait
+  }
   if (tonomyWaitPromise) return tonomyWaitPromise;
   tonomyWaitPromise = new Promise((resolve, reject) => {
     const ready = () => {
