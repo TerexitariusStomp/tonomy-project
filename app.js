@@ -1,6 +1,7 @@
 console.log('app.js loaded');
 
-import { setSettings } from "./vendor/tonomy-id-sdk.esm.js";
+// Use CDN-bundled SDK (includes deps) to avoid bare-specifier failures in browser.
+import { setSettings } from "https://unpkg.com/@tonomy/tonomy-id-sdk@0.36.0/build/sdk/index.module.js";
 import { buildTonomyLoginDeepLink, buildTonomyLoginQrLink, createSigner } from "./signer.js";
 
 // Configure Tonomy SDK endpoints before any signer/login calls.

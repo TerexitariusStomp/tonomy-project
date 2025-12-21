@@ -12,7 +12,13 @@
   <!-- Tonomy ID SDK local load (no CDN) -->
   <script type="module">
     try {
-      const mod = await import("./vendor/tonomy-id-sdk.esm.js");
+      // Prefer CDN bundle (has deps bundled); fall back to local vendor copy if present.
+      let mod;
+      try {
+        mod = await import("https://unpkg.com/@tonomy/tonomy-id-sdk@0.36.0/build/sdk/index.module.js");
+      } catch (_cdne) {
+        mod = await import("./vendor/tonomy-id-sdk.esm.js");
+      }
       const create =
         mod.createTonomyId ||
         mod.default?.createTonomyId ||
@@ -22,7 +28,7 @@
         throw new Error("createTonomyId export missing");
       }
       window.createTonomyId = create;
-      window.TonomySDKUrl = "./vendor/tonomy-id-sdk.esm.js";
+      window.TonomySDKUrl = "https://unpkg.com/@tonomy/tonomy-id-sdk@0.36.0/build/sdk/index.module.js";
       window.dispatchEvent(new Event("tonomy-sdk-ready"));
     } catch (err) {
       window.dispatchEvent(
