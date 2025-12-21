@@ -11,24 +11,43 @@ The current codebase in `app.js` and `signer.js` uses the Tonomy ID SDK v1.0.0 (
 - The project is served at `http://localhost:3000` (current setup via `npx http-server . -p 3000 -c-1`)
 
 ## Step 1: Install Tonomy ID SDK (Already Bundled)
-The SDK is loaded via CDN in `index.html`:
+The SDK is loaded via CDN in `index.html` using a preloader with multi-CDN fallback:
 ```html
-<script type="module">
-  let pkg;
-  try {
-    pkg = await import("https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@1.0.0/+esm");
-  } catch (e) {
-    try {
-      pkg = await import("https://unpkg.com/@tonomy/tonomy-id-sdk@1.0.0?module");
-    } catch (e2) {
-      try {
-        pkg = await import("https://cdn.skypack.dev/@tonomy/tonomy-id-sdk@1.0.0");
-      } catch (e3) {
-        pkg = await import("https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle&exports=createTonomyId");
+<script>
+  (function loadTonomySdk() {
+    const cdns = [
+      "https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@1.0.0/+esm",
+      "https://unpkg.com/@tonomy/tonomy-id-sdk@1.0.0/dist/tonomy-id-sdk.esm.js",
+      "https://unpkg.com/@tonomy/tonomy-id-sdk@1.0.0?module",
+      "https://cdn.skypack.dev/@tonomy/tonomy-id-sdk@1.0.0",
+      "https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle&exports=createTonomyId"
+    ];
+    let lastErr = null;
+    const readyEvent = () => window.dispatchEvent(new Event("tonomy-sdk-ready"));
+    const failEvent = (detail) => window.dispatchEvent(new CustomEvent("tonomy-sdk-failed", { detail }));
+
+    (async () => {
+      for (const url of cdns) {
+        try {
+          const mod = await import(url);
+          const create =
+            mod.createTonomyId ||
+            mod.default?.createTonomyId ||
+            mod.default ||
+            mod;
+          if (typeof create === "function") {
+            window.createTonomyId = create;
+            window.TonomySDKUrl = url;
+            readyEvent();
+            return;
+          }
+        } catch (err) {
+          lastErr = err;
+        }
       }
-    }
-  }
-  window.createTonomyId = pkg.createTonomyId || pkg.default?.createTonomyId || pkg.default || pkg;
+      failEvent(lastErr?.message || "Could not load Tonomy ID SDK from any CDN");
+    })();
+  })();
 </script>
 ```
 No changes needed here. For local bundling (optional, for offline dev):

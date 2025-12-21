@@ -27,6 +27,38 @@ export function buildTonomyLoginDeepLink(callbackUrl = typeof window !== "undefi
   return `tonomyid://login?${params.toString()}`;
 }
 
+// Wait for the SDK to be injected by the preloader in index.html
+let tonomyWaitPromise = null;
+async function waitForTonomySdk(timeoutMs = 15000) {
+  if (typeof window === "undefined") throw new Error("No window context for Tonomy SDK");
+  if (window.createTonomyId) return window.createTonomyId;
+  if (tonomyWaitPromise) return tonomyWaitPromise;
+  tonomyWaitPromise = new Promise((resolve, reject) => {
+    const ready = () => {
+      cleanup();
+      if (window.createTonomyId) resolve(window.createTonomyId);
+      else reject(new Error("Tonomy SDK ready event fired but createTonomyId missing"));
+    };
+    const failed = (ev) => {
+      cleanup();
+      reject(new Error(ev?.detail || "Tonomy SDK failed to load"));
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("Timed out waiting for Tonomy SDK"));
+    }, timeoutMs);
+    const cleanup = () => {
+      clearTimeout(timer);
+      window.removeEventListener("tonomy-sdk-ready", ready);
+      window.removeEventListener("tonomy-sdk-failed", failed);
+    };
+    window.addEventListener("tonomy-sdk-ready", ready, { once: true });
+    window.addEventListener("tonomy-sdk-failed", failed, { once: true });
+    if (window.createTonomyId) ready();
+  });
+  return tonomyWaitPromise;
+}
+
 export async function createSigner(kind = detectSignerPreference(), network) {
   const net = normalizeNetwork(network);
   if (kind === "tonomy") return createTonomySigner(net);
@@ -87,36 +119,12 @@ export async function buildTonomyLoginQrLink(network, { callbackUrl } = {}) {
 async function createTonomySigner(network) {
   let tonomy = window.tonomy;
   if (!tonomy) {
-    // Use injected createTonomyId if present (loaded via CDN), otherwise dynamic import via CDN.
+    // Wait for preloader to inject the SDK
     let createTonomyIdGlobal = window.createTonomyId;
     if (!createTonomyIdGlobal) {
-      let lastErr = null;
-      // Try jsdelivr +esm first (closer to npm dist), then esm.sh bundle as fallback.
-      const cdnCandidates = [
-        "https://cdn.jsdelivr.net/npm/@tonomy/tonomy-id-sdk@1.0.0/+esm",
-        "https://unpkg.com/@tonomy/tonomy-id-sdk@1.0.0/dist/tonomy-id-sdk.esm.js",
-        "https://unpkg.com/@tonomy/tonomy-id-sdk@1.0.0?module",
-        "https://cdn.skypack.dev/@tonomy/tonomy-id-sdk@1.0.0",
-        "https://esm.sh/@tonomy/tonomy-id-sdk@1.0.0?bundle&exports=createTonomyId"
-      ];
-      for (const url of cdnCandidates) {
-        try {
-          const mod = await import(url);
-          createTonomyIdGlobal =
-            mod.createTonomyId ||
-            mod.default?.createTonomyId ||
-            mod.default ||
-            mod;
-          if (createTonomyIdGlobal) {
-            break;
-          }
-        } catch (e) {
-          lastErr = e;
-        }
-      }
-      if (!createTonomyIdGlobal) {
-        throw new Error(`Tonomy ID SDK not injected. Last error: ${lastErr?.message || "unknown"}`);
-      }
+      createTonomyIdGlobal = await waitForTonomySdk().catch((err) => {
+        throw new Error(`Tonomy ID SDK not injected: ${err.message}`);
+      });
     }
     tonomy = await createTonomyIdGlobal({
       appId: TONOMY_APP_ID,
