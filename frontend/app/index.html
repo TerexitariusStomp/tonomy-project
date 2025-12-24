@@ -4,9 +4,54 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>cXc Pangea Integration</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:400,600,700&display=swap">
   <link rel="stylesheet" href="./style.css">
-  <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-api.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/eosjs-jsonrpc.min.js"></script>
+  <!-- Import map for Tonomy SDK dependencies -->
+  <script type="importmap">
+    {
+      "imports": {
+        "@wharfkit/antelope": "https://unpkg.com/@wharfkit/antelope@1.0.1/dist/antelope.esm.js",
+        "@wharfkit/abicache": "https://unpkg.com/@wharfkit/abicache@1.0.1/dist/abicache.esm.js",
+        "@wharfkit/session": "https://unpkg.com/@wharfkit/session@1.0.1/dist/session.esm.js",
+        "@greymass/eosio": "https://unpkg.com/@greymass/eosio@0.4.0/dist/index.esm.js",
+        "@wharfkit/core": "https://unpkg.com/@wharfkit/core@1.0.1/dist/core.esm.js",
+        "cross-fetch": "https://unpkg.com/cross-fetch@3.1.5/dist/index.mjs",
+        "@consento/sync-randombytes": "https://unpkg.com/@consento/sync-randombytes@1.0.0/dist/index.esm.js",
+        "elliptic": "https://cdn.skypack.dev/elliptic",
+        "err-code": "https://cdn.skypack.dev/err-code",
+        "bn.js": "https://cdn.skypack.dev/bn.js",
+        "hash.js": "https://cdn.skypack.dev/hash.js",
+        "inherits": "https://cdn.skypack.dev/inherits",
+        "minimalistic-assert": "https://cdn.skypack.dev/minimalistic-assert",
+        "protons-runtime": "https://cdn.skypack.dev/protons-runtime",
+        "uint8arrays": "https://cdn.skypack.dev/uint8arrays",
+        "it-length-prefixed": "https://cdn.skypack.dev/it-length-prefixed",
+        "protons": "https://cdn.skypack.dev/protons",
+        "multiformats": "https://cdn.skypack.dev/multiformats"
+      }
+    }
+  </script>
+  <!-- Tonomy ID SDK preload -->
+  <script type="module">
+    try {
+      const mod = await import("https://cdn.skypack.dev/@tonomy/tonomy-id-sdk@0.36.0");
+      const create =
+        mod.createTonomyId ||
+        mod.default?.createTonomyId ||
+        mod.default ||
+        mod;
+      if (typeof create !== "function") {
+        throw new Error("createTonomyId export missing");
+      }
+      window.createTonomyId = create;
+      window.TonomySDKUrl = "https://cdn.skypack.dev/@tonomy/tonomy-id-sdk@0.36.0";
+      window.dispatchEvent(new Event("tonomy-sdk-ready"));
+    } catch (err) {
+      window.dispatchEvent(
+        new CustomEvent("tonomy-sdk-failed", { detail: err?.message || String(err) })
+      );
+    }
+  </script>
 </head>
 <body>
   <header>
@@ -14,35 +59,78 @@
       <span class="logo">cXc</span>
       <span class="subtitle">Pangea Passport</span>
     </div>
-    <button id="connectBtn" class="btn primary">Connect Tonomy ID</button>
+    <div class="auth-controls">
+      <select id="networkSelect">
+        <option value="pangea">Pangea (Tonomy)</option>
+        <option value="eos">EOS Mainnet</option>
+        <option value="jungle">Jungle</option>
+        <option value="custom">Custom</option>
+        <option value="local">Local Signer (Dev)</option>
+      </select>
+      <input id="customRpc" class="hidden" placeholder="Custom RPC" />
+      <input id="customChainId" class="hidden" placeholder="Custom Chain ID" />
+    </div>
+    <button id="connectBtn" class="btn primary">Connect with Tonomy</button>
   </header>
 
-  <main>
-    <section class="card two-column">
-      <div>
-        <h2>Invite Friends</h2>
-        <p>Share your username to earn tetrahedral BLUX rewards.</p>
-        <label>Inviter Code</label>
-        <input id="inviteCode" placeholder="alice.cxc">
-        <label>Invite New User</label>
-        <input id="inviteTarget" placeholder="bob.cxc">
-        <button id="sendInvite" class="btn primary">Send Invite</button>
-        <div id="inviteResult" class="hint"></div>
+  <section class="card" id="qrCard" style="display: none;">
+    <h2>Connect via QR</h2>
+    <p>Scan with the Tonomy mobile wallet to connect this session.</p>
+    <div class="grid">
+      <div class="qr-panel">
+        <div id="tonomyQr" class="qr-box"></div>
       </div>
-      <div>
-        <h3>Your Stats</h3>
-        <div id="stats" class="stat-grid">
-          <div><span>Direct</span><strong>0</strong></div>
-          <div><span>Network</span><strong>0</strong></div>
-          <div><span>Rewards</span><strong>0 BLUX</strong></div>
-        </div>
+    </div>
+    <div id="tonomyQrStatus" class="hint"></div>
+  </section>
+
+  <main>
+    <section class="card">
+      <h2>Onboarding</h2>
+      <p>Resume the guided flow: welcome -> create account -> invite code -> verification -> tutorial.</p>
+      <div id="onboardingList" class="step-list"></div>
+      <div class="actions">
+        <button id="onboardingNext" class="btn primary">Next step</button>
+        <button id="onboardingReset" class="btn secondary">Restart</button>
+        <span id="onboardingStatus" class="hint"></span>
       </div>
     </section>
 
     <section class="card two-column">
       <div>
-        <h2>Daily Upvotes</h2>
+        <h2>Tonomy Invite Program</h2>
+        <p>Redeem an invite on Tonomy to join the multi-level, tetrahedral scoring program. Invites are rate-limited and new accounts must be 30+ days old.</p>
+        <label>Your Tonomy account (share this as your invite code)</label>
+        <input id="inviteCode" placeholder="alice.cxc">
+        <label>Inviter you're redeeming</label>
+        <input id="inviteTarget" placeholder="referrer (e.g., bob.cxc)">
+        <div class="actions">
+          <button id="sendInvite" class="btn primary">Redeem Invite</button>
+          <button id="claimReward" class="btn secondary">Claim BLUX Reward</button>
+        </div>
+        <div id="inviteResult" class="hint"></div>
+        <div class="stat-grid" id="inviteScoreGrid">
+          <div><span>Score</span><strong id="inviteScoreValue">0</strong></div>
+          <div><span>Tetra Position</span><strong id="invitePositionValue">-</strong></div>
+          <div><span>Cooldown</span><strong id="inviteCooldownValue">-</strong></div>
+          <div><span>Claimed</span><strong id="inviteClaimedValue">-</strong></div>
+        </div>
+      </div>
+      <div>
+        <h3>Program Signals</h3>
+        <div id="inviteConfigBox" class="list-box">
+          <div class="muted">Connect to load invite config.</div>
+        </div>
+        <div id="inviteGlobalStats" class="hint">Global stats will appear after loading the contract.</div>
+      </div>
+    </section>
+
+    <section class="card two-column">
+      <div>
+        <h2>Passport & Daily Upvotes</h2>
         <p>Claim daily upvotes based on your Passport verification level.</p>
+        <div class="pill" id="passportBadge">Passport level 0</div>
+        <div id="passportHint" class="hint">Connect with Tonomy to load your level.</div>
         <button id="claimUpvotes" class="btn primary">Claim Daily Upvotes</button>
         <div id="upvoteStatus" class="hint"></div>
       </div>
@@ -52,11 +140,17 @@
           <div class="fill" style="width: 0%"></div>
         </div>
         <div id="upvoteCounts" class="hint">0 / 0 upvotes</div>
+        <div id="upvoteReset" class="hint">Reset time not loaded</div>
       </div>
     </section>
 
     <section class="card">
-      <h2>Bridge BLUX: WAX → Tonomy</h2>
+      <h2>Bridge BLUX: WAX -> Tonomy</h2>
+      <div class="stepper" id="bridgeStepper">
+        <div class="step" data-step="memo"><div class="badge">1</div><div>Generate memo</div></div>
+        <div class="step" data-step="lock"><div class="badge">2</div><div>Lock on WAX</div></div>
+        <div class="step" data-step="mint"><div class="badge">3</div><div>Mint on Tonomy</div></div>
+      </div>
       <div class="grid">
         <div>
           <label>Amount (BLUX)</label>
@@ -70,12 +164,40 @@
           <label>WAX Account</label>
           <input id="waxAccount" placeholder="alice.wam">
         </div>
+        <div>
+          <label>Bridge Memo</label>
+          <input id="bridgeMemo" placeholder="TRANSFER_..." readonly>
+        </div>
       </div>
       <button id="bridgeBtn" class="btn primary">Bridge Tokens</button>
+      <button id="bridgeCheckBtn" class="btn secondary">Check Bridge Status</button>
+      <div class="hint">
+        Explorer: <a id="bridgeExplorerWax" class="hidden" target="_blank" rel="noreferrer">WAX tx</a>
+        <a id="bridgeExplorerTonomy" class="hidden" target="_blank" rel="noreferrer">Tonomy tx</a>
+      </div>
       <div id="bridgeStatus" class="hint"></div>
+    </section>
+
+    <section class="card">
+      <h2>Referral Dashboard</h2>
+      <p>Leaderboard and downstream visibility from the TonomyInvite contract (multi-level scoring + cooldowns).</p>
+      <div id="referralTotals" class="hint">Connect to load leaderboard and totals.</div>
+      <div id="referralList" class="list-box">-</div>
     </section>
   </main>
 
-  <script src="./app.js"></script>
+  <!-- eosjs UMD bundle for browser usage -->
+  <script src="https://cdn.jsdelivr.net/npm/eosjs@22.1.0/dist/index.min.js" crossorigin="anonymous"></script>
+  <script>
+    // Bridge eosjs UMD exports to legacy globals expected by app.js/signer.js
+    if (window.eosjs) {
+      const { Api, JsonRpc, JsSignatureProvider } = window.eosjs;
+      window.eosjs_api = { Api };
+      window.eosjs_jsonrpc = { JsonRpc };
+      window.eosjs_jssig = { JsSignatureProvider };
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
